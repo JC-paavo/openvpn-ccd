@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title><!DOCTYPE html>
+        <html lang="zh-CN">
+        <head>
+        <meta charset="UTF-8">
+        <title>系统日志</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container">
+        <a class="navbar-brand" href="#">OpenVPN CCD配置管理</a>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item">
+                    <a class="nav-link" href="/">首页</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/accounts">账号管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/templates">模板管理</a>
+                </li>
+                <li class="nav-item active">
+                    <a class="nav-link" href="/logs">日志</a>
+                </li>
+            </ul>
+        </div>
+        <div class="navbar-nav">
+                <span class="navbar-text me-3">
+                    欢迎，{{.user}}
+                </span>
+            <a class="nav-link" href="/logout">退出登录</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container mt-5">
+    <h1 class="mb-4">系统日志</h1>
+
+    <div class="card">
+        <div class="card-body">
+            <table class="table table-striped">
+                <thead>
+                <tr>
+                    <th>时间</th>
+                    <th>用户</th>
+                    <th>操作</th>
+                    <th>详情</th>
+                    <th>IP地址</th>
+                    <th>用户代理</th>
+                </tr>
+                </thead>
+                <tbody>
+                {{range .logs}}
+                <tr>
+                    <td>{{.CreatedAt.Format "2006-01-02 15:04:05"}}</td>
+                    <td>{{.User}}</td>
+                    <td>{{.Action}}</td>
+                    <td>{{.Details}}</td>
+                    <td>{{.IPAddress}}</td>
+                    <td>{{.UserAgent}}</td>
+                </tr>
+                {{end}}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</body>
+</html></title>
+</head>
+<body>
+
+</body>
+</html>

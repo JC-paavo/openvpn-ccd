@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <title>添加模板</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    .error-message {
+      color: red;
+      font-size: 0.9em;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+<nav class="navbar navbar-expand-lg navbar-light bg-light">
+  <div class="container">
+    <a class="navbar-brand" href="#">OpenVPN CCD配置管理</a>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" href="/">首页</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/accounts">账号管理</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/templates">模板管理</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="/logs">日志</a>
+        </li>
+      </ul>
+    </div>
+    <div class="navbar-nav">
+                <span class="navbar-text me-3">
+                    欢迎，{{.user}}
+                </span>
+      <a class="nav-link" href="/logout">退出登录</a>
+    </div>
+  </div>
+</nav>
+
+<div class="container mt-5">
+  <h1 class="mb-4">添加模板</h1>
+
+  <form id="addTemplateForm">
+    <div class="form-group">
+      <label for="name" class="form-label">模板名称</label>
+      <input type="text" class="form-control" id="name" required>
+      <div id="nameError" class="error-message"></div>
+    </div>
+
+    <div class="form-group">
+      <label for="type" class="form-label">模板类型</label>
+      <select class="form-control" id="type" required>
+        <option value="">请选择类型</option>
+        <option value="运维管理员">运维管理员</option>
+        <option value="开发人员">开发人员</option>
+        <option value="项目经理">项目经理</option>
+        <option value="技术经理">技术经理</option>
+      </select>
+      <div id="typeError" class="error-message"></div>
+    </div>
+
+    <div class="form-group">
+      <label for="description" class="form-label">描述</label>
+      <textarea class="form-control" id="description" rows="3"></textarea>
+    </div>
+
+    <div class="form-group">
+      <label class="form-label">选择IRoute路由</label>
+      <div class="form-check" style="max-height: 300px; overflow-y: auto;">
+        {{range .iroutes}}
+        <div class="form-check">
+          <input class="form-check-input" type="checkbox" id="iroute_{{.ID}}" name="iroutes" value="{{.ID}}">
+          <label class="form-check-label" for="iroute_{{.ID}}">
+            {{.Route}} {{if .Account}} ({{.Account.Username}}){{end}}
+          </label>
+        </div>
+        {{end}}
+      </div>
+      <div id="iroutesError" class="error-message"></div>
+    </div>
+
+    <div class="mt-4">
+      <button type="submit" class="btn btn-primary">保存</button>
+      <a href="/templates" class="btn btn-secondary">取消</a>
+    </div>
+  </form>
+</div>
+
+<script>
+  // 显示错误信息
+  function showError(elementId, message) {
+    const element = document.getElementById(elementId);
+    element.textContent = message;
+    element.style.display = 'block';
+  }
+
+  // 隐藏错误信息
+  function hideError(elementId) {
+    const element = document.getElementById(elementId);
+    element.style.display = 'none';
+  }
+
+  // 提交表单
+  document.getElementById('addTemplateForm').addEventListener('submit', function(e) {
+    e.preventDefault();
+
+    // 清除所有错误信息
+    const errorElements = document.querySelectorAll('.error-message');
+    errorElements.forEach(el => el.style.display = 'none');
+
+    // 验证表单
+    const name = document.getElementById('name').value.trim();
+    const type = document.getElementById('type').value;
+
+    if (name === '') {
+      showError('nameError', '模板名称不能为空');
+      return;
+    }
+
+    if (type === '') {
+      showError('typeError', '请选择模板类型');
+      return;
+    }
+
+    // 获取选中的IRoute路由
+    const selectedIRouteIds = [];
+    document.querySelectorAll('input[name="iroutes"]:checked').forEach(checkbox => {
+      selectedIRouteIds.push(parseInt(checkbox.value));
+    });
+
+    if (selectedIRouteIds.length === 0) {
+      showError('iroutesError', '请至少选择一个IRoute路由');
+      return;
+    }
+
+    // 构建模板数据
+    const templateData = {
+      template: {
+        name: name,
+        type: type,
+        description: document.getElementById('description').value
+      },
+      iroute_ids: selectedIRouteIds
+    };
+
+    // 提交数据
+    fetch('/api/templates', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(templateData)
+    })
+            .then(response => response.json())
+            .then(data => {
+              if (data.message) {
+                alert(data.message);
+                window.location.href = '/templates';
+              } else {
+                alert(data.error || "保存失败");
+              }
+            })
+            .catch(error => {
+              alert("保存失败: " + error.message);
+            });
+  });
+</script>
+</body>
+</html>
