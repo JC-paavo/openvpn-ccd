@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <title>添加模板</title>
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <!-- 添加Select2 CSS -->
+  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
+  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
   <style>
     .error-message {
       color: red;
@@ -51,37 +54,48 @@
       <div id="nameError" class="error-message"></div>
     </div>
 
-    <div class="form-group">
-      <label for="type" class="form-label">模板类型</label>
-      <select class="form-control" id="type" required>
-        <option value="">请选择类型</option>
-        <option value="运维管理员">运维管理员</option>
-        <option value="开发人员">开发人员</option>
-        <option value="项目经理">项目经理</option>
-        <option value="技术经理">技术经理</option>
-      </select>
-      <div id="typeError" class="error-message"></div>
-    </div>
+<!--    <div class="form-group">-->
+<!--      <label for="type" class="form-label">模板类型</label>-->
+<!--      <select class="form-control" id="type" required>-->
+<!--        <option value="">请选择类型</option>-->
+<!--        <option value="运维管理员">运维管理员</option>-->
+<!--        <option value="开发人员">开发人员</option>-->
+<!--        <option value="项目经理">项目经理</option>-->
+<!--        <option value="技术经理">技术经理</option>-->
+<!--      </select>-->
+<!--      <div id="typeError" class="error-message"></div>-->
+<!--    </div>-->
 
     <div class="form-group">
       <label for="description" class="form-label">描述</label>
       <textarea class="form-control" id="description" rows="3"></textarea>
     </div>
 
+<!--    <div class="form-group">-->
+<!--      <label class="form-label">选择IRoute路由</label>-->
+<!--      <div class="form-check" style="max-height: 300px; overflow-y: auto;">-->
+<!--        {{range .iroutes}}-->
+<!--        <div class="form-check">-->
+<!--          <input class="form-check-input" type="checkbox" id="iroute_{{.ID}}" name="iroutes" value="{{.ID}}">-->
+<!--          <label class="form-check-label" for="iroute_{{.ID}}">-->
+<!--             {{.DisplayName}}-->
+<!--          </label>-->
+<!--        </div>-->
+<!--        {{end}}-->
+<!--      </div>-->
+<!--      <div id="iroutesError" class="error-message"></div>-->
+<!--    </div>-->
     <div class="form-group">
       <label class="form-label">选择IRoute路由</label>
-      <div class="form-check" style="max-height: 300px; overflow-y: auto;">
+      <select class="form-select" id="iroutes" name="iroutes" multiple>
+<!--        <option value="" selected disabled >请选择IRoute路由</option>-->
         {{range .iroutes}}
-        <div class="form-check">
-          <input class="form-check-input" type="checkbox" id="iroute_{{.ID}}" name="iroutes" value="{{.ID}}">
-          <label class="form-check-label" for="iroute_{{.ID}}">
-            {{.Route}} {{if .Account}} ({{.Account.Username}}){{end}}
-          </label>
-        </div>
+        <option value="{{.ID}}">{{.DisplayName}}</option>
         {{end}}
-      </div>
+      </select>
       <div id="iroutesError" class="error-message"></div>
     </div>
+
 
     <div class="mt-4">
       <button type="submit" class="btn btn-primary">保存</button>
@@ -90,7 +104,17 @@
   </form>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
 <script>
+  // 初始化Select2
+  $(document).ready(function() {
+    $('#iroutes').select2({
+      theme: 'bootstrap-5',
+      placeholder: '请选择IRoute路由',
+      closeOnSelect: false
+    });
+  });
   // 显示错误信息
   function showError(elementId, message) {
     const element = document.getElementById(elementId);
@@ -114,24 +138,14 @@
 
     // 验证表单
     const name = document.getElementById('name').value.trim();
-    const type = document.getElementById('type').value;
+    //const type = document.getElementById('type').value;
 
     if (name === '') {
       showError('nameError', '模板名称不能为空');
       return;
     }
-
-    if (type === '') {
-      showError('typeError', '请选择模板类型');
-      return;
-    }
-
-    // 获取选中的IRoute路由
-    const selectedIRouteIds = [];
-    document.querySelectorAll('input[name="iroutes"]:checked').forEach(checkbox => {
-      selectedIRouteIds.push(parseInt(checkbox.value));
-    });
-
+    const selectedIRouteIds = $('#iroutes').val().map(id => parseInt(id));
+    console.log(selectedIRouteIds);
     if (selectedIRouteIds.length === 0) {
       showError('iroutesError', '请至少选择一个IRoute路由');
       return;
@@ -141,7 +155,6 @@
     const templateData = {
       template: {
         name: name,
-        type: type,
         description: document.getElementById('description').value
       },
       iroute_ids: selectedIRouteIds
