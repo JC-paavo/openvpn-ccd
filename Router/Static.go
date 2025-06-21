@@ -66,8 +66,45 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 				c.HTML(http.StatusNotFound, "error.html", gin.H{"error": err.Error()})
 				return
 			}
+			//提取非关联路由
+			var customRoutes []model.Route
+			if err := db.
+				Joins("JOIN account_routes ON routes.id = account_routes.route_id").
+				Where("account_routes.account_id = ?", account.ID).
+				Where("routes.id NOT IN (?)", db.Table("template_routes").Select("route_id")).
+				Where("routes.id NOT IN (?)", db.Table("account_routes").
+					Select("route_id").
+					Joins("JOIN accounts ON account_routes.account_id = accounts.id").
+					Where("accounts.is_iroute = ?", true)).
+				Find(&customRoutes).Error; err != nil {
+				// 处理错误
+			}
+			fmt.Println(customRoutes)
+			//提取template select
+			allTemplates, err := ccdManager.GetAllTemplates()
+			selectedTemplateIDs := make(map[uint]bool)
+			for _, template := range account.Templates {
+				selectedTemplateIDs[template.ID] = true
+			}
+			for _, template := range allTemplates {
+				if _, ok := selectedTemplateIDs[template.ID]; !ok {
+					selectedTemplateIDs[template.ID] = false
+				}
+			}
+			//提取iroute select
+			allIRouteAccounts, err := ccdManager.GetAllIRouteAccounts()
+			selectedIRouteIDs := make(map[uint]bool)
+			for _, irouteAccount := range allIRouteAccounts {
+				selectedIRouteIDs[irouteAccount.ID] = false
+			}
+			for _, route := range account.Routes {
+				for _, account := range route.Accounts {
+					if account.IsIRoute {
+						selectedIRouteIDs[account.ID] = true
+					}
+				}
+			}
 
-			irouteAccounts, err := ccdManager.GetAllIRouteAccounts()
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
@@ -78,12 +115,14 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
 			}
-
 			c.HTML(http.StatusOK, "edit_account.html", gin.H{
-				"user":           user,
-				"account":        account,
-				"irouteAccounts": irouteAccounts,
-				"templates":      templates,
+				"user":                user,
+				"account":             account,
+				"irouteAccounts":      allIRouteAccounts,
+				"templates":           templates,
+				"selectedTemplateIDs": selectedTemplateIDs,
+				"selectedIRouteIDs":   selectedIRouteIDs,
+				"customRoutes":        customRoutes,
 			})
 		})
 

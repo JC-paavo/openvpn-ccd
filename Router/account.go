@@ -48,7 +48,7 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		}
 		// 转换为模型结构
 		newAccount := model.Account{
-			Model:       gorm.Model{},
+
 			Username:    Account.Username,
 			Password:    Account.Password,
 			DisplayName: Account.DisplayName,
@@ -64,8 +64,7 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		}
 		user, _ := c.Get("username")
 		username := user.(string)
-
-		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, IrouteIDsrUnits); err != nil {
+		if err := ccdManager.CreateOrUpdateAccount(&newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -85,8 +84,7 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 			TemplateIDs []string `json:"template_ids"`
 			IrouteIDs   []string `json:"iroute_ids"`
 		}
-		var account model.Account
-		if err := c.ShouldBindJSON(&account); err != nil {
+		if err := c.ShouldBindJSON(&Account); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
@@ -118,17 +116,21 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 			Phone:       Account.Phone,
 			IsIRoute:    Account.IsIRoute,
 			Enabled:     Account.Enabled,
+			Routes:      make([]model.Route, len(Account.Routes)),
 			// 需要将routes转换为模型中的Route结构
 		}
-		newAccount.Routes = make([]model.Route, len(Account.Routes))
-		for i, route := range Account.Routes {
-			newAccount.Routes[i] = model.Route{Route: route}
-		}
+		if len(Account.Routes) > 0 {
+			for i, route := range Account.Routes {
+				newAccount.Routes[i] = model.Route{Route: route}
+			}
 
+		} else {
+			newAccount.Routes = nil
+		}
+		//fmt.Println(newAccount.Routes)
 		user, _ := c.Get("username")
 		username := user.(string)
-
-		if err := ccdManager.CreateOrUpdateAccount(account, username, c, IrouteIDsrUnits, TemplateIDsUints); err != nil {
+		if err := ccdManager.CreateOrUpdateAccount(&newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
