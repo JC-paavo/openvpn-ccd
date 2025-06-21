@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <title>模板管理</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -49,7 +49,6 @@
                 <tr>
                     <th>ID</th>
                     <th>模板名称</th>
-                    <th>模板类型</th>
                     <th>描述</th>
                     <th>包含IRoute路由数量</th>
                     <th>使用账号数量</th>
@@ -61,13 +60,12 @@
                 <tr>
                     <td>{{.ID}}</td>
                     <td>{{.Name}}</td>
-                    <td>{{.Type}}</td>
                     <td>{{.Description}}</td>
-                    <td>{{len .IRoutes}}</td>
+                    <td>{{.IRouteCount}}</td>
                     <td>{{len .Accounts}}</td>
                     <td>
                         <a href="/template/edit/{{.ID}}" class="btn btn-sm btn-warning">编辑</a>
-                        <button class="btn btn-sm btn-danger" onclick="deleteTemplate({{.ID}})">删除</button>
+                        <button class="btn btn-sm btn-danger" onclick=deleteTemplate({{.ID}})>删除</button>
                     </td>
                 </tr>
                 {{end}}

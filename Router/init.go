@@ -5,6 +5,7 @@ import (
 	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
+	"html/template"
 	"log"
 	"openvpn-ccd/Middle"
 	"openvpn-ccd/model"
@@ -28,14 +29,32 @@ func InitRoute(r *gin.Engine, ccdManager *model.CCDManager, db *gorm.DB, logger 
 		Path:     "/",
 		MaxAge:   86400 * 7, // 7天
 		HttpOnly: true,
-		Secure:   true,
+		//Secure:   true,
 	})
 
 	r.Use(sessions.Sessions("auth-session", store))
-	//初始化静态路由
-	staticRoute(r, store, ccdManager, db)
+
+	// 添加日志中间件
+	//r.Use(Middle.LoggingMiddleware(db))
+
 	//初始化login路由
 	loginRouter(r, store, db, adminUser, adminPass)
+
+	//初始化静态路由
+	// 静态文件服务
+	r.Static("/static", "./static")
+	add := func(a, b int) int {
+		return a + b
+	}
+	r.SetFuncMap(template.FuncMap{
+		"add": add,
+	})
+	r.LoadHTMLGlob("templates/*")
+	web := r.Group("")
+	web.Use(Middle.AuthMiddleware(store))
+
+	// Web界面路由（需要认证）
+	staticRoute(web, ccdManager, db)
 
 	api := r.Group("/api")
 	api.Use(Middle.AuthMiddleware(store))

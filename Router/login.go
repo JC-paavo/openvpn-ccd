@@ -9,8 +9,6 @@ import (
 )
 
 func loginRouter(r *gin.Engine, store cookie.Store, db *gorm.DB, adminUser, adminPass string) {
-	// 添加日志中间件
-	r.Use(Middle.LoggingMiddleware(db))
 	// 登录相关路由
 	r.GET("/login", func(c *gin.Context) {
 		c.HTML(http.StatusOK, "login.html", nil)

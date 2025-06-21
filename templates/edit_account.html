@@ -3,46 +3,42 @@
 <head>
   <meta charset="UTF-8">
   <title>编辑账号</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/select2.min.css" rel="stylesheet">
+  <link href="/static/css/select2-bootstrap-5-theme.min.css" rel="stylesheet">
   <style>
     .error-message {
       color: red;
       font-size: 0.9em;
       display: none;
     }
-    .form-group {
-      margin-bottom: 1rem;
+    .route-input-group {
+      margin-bottom: 0.5rem;
+    }
+    html, body {
+      height: 100%;
+    }
+    body {
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+    .container {
+      flex: 1;
+      padding-bottom: 20px;
+    }
+    .error-message {
+      color: red;
+      font-size: 0.9em;
+      display: none;
+    }
+    .route-input-group {
+      margin-bottom: 0.5rem;
     }
   </style>
 </head>
 <body>
-<nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container">
-    <a class="navbar-brand" href="#">OpenVPN CCD配置管理</a>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav">
-        <li class="nav-item">
-          <a class="nav-link" href="/">首页</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/accounts">账号管理</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/templates">模板管理</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/logs">日志</a>
-        </li>
-      </ul>
-    </div>
-    <div class="navbar-nav">
-                <span class="navbar-text me-3">
-                    欢迎，{{.user}}
-                </span>
-      <a class="nav-link" href="/logout">退出登录</a>
-    </div>
-  </div>
-</nav>
+<!-- 导航栏保持不变... -->
 
 <div class="container mt-5">
   <h1 class="mb-4">编辑账号 - {{.account.Username}}</h1>
@@ -50,6 +46,7 @@
   <form id="editAccountForm">
     <div class="row">
       <div class="col-md-6">
+        <!-- 基础信息字段 -->
         <div class="form-group">
           <label for="username" class="form-label">用户名</label>
           <input type="text" class="form-control" id="username" value="{{.account.Username}}" disabled>
@@ -82,272 +79,239 @@
       </div>
 
       <div class="col-md-6">
+        <!-- 账号类型显示 -->
         <div class="form-group">
           <label class="form-label">账号类型</label>
           <div class="form-check">
-            <input class="form-check-input" type="radio" name="accountType" id="irouteType" value="iroute" {{if .account.IsIRoute}}checked{{end}}>
-            <label class="form-check-label" for="irouteType">
-              IRoute账号 (添加 iroute 路由)
-            </label>
+            <input class="form-check-input" type="radio" name="accountType" id="irouteType" value="iroute"
+                   {{if .account.IsIRoute}}checked{{end}} disabled>
+            <label class="form-check-label" for="irouteType">IRoute账号</label>
           </div>
           <div class="form-check">
-            <input class="form-check-input" type="radio" name="accountType" id="normalType" value="normal" {{if not .account.IsIRoute}}checked{{end}}>
-            <label class="form-check-label" for="normalType">
-              普通账号 (关联iroute路由)
-            </label>
+            <input class="form-check-input" type="radio" name="accountType" id="normalType" value="normal"
+                   {{if not .account.IsIRoute}}checked{{end}} disabled>
+            <label class="form-check-label" for="normalType">普通账号</label>
           </div>
         </div>
 
-        <div class="form-group" id="irouteRouteField" {{if not .account.IsIRoute}}style="display: none;"{{end}}>
-          <label for="irouteRoute" class="form-label">IRoute路由 (例如: 10.8.0.0 255.255.255.0)</label>
-          <input type="text" class="form-control" id="irouteRoute" value="{{.account.IRouteValue}}">
+        <!-- 路由配置区域 -->
+        {{if .account.IsIRoute}}
+        <div class="form-group" id="irouteRouteField">
+          <label class="form-label">IRoute路由</label>
+          <div id="irouteRoutesContainer">
+            {{range .account.Routes}}
+            <div class="input-group route-input-group">
+              <input type="text" class="form-control irouteRouteInput" value="{{.Route}}" required>
+              <button class="btn btn-outline-danger" type="button" onclick="removeRouteInput(this)">删除</button>
+            </div>
+            {{end}}
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addIRouteRouteInput()">
+            添加路由
+          </button>
           <div id="irouteRouteError" class="error-message"></div>
         </div>
-
-        <div class="form-group" id="normalRouteField" {{if .account.IsIRoute}}style="display: none;"{{end}}>
-          <label for="normalRoute" class="form-label">路由信息 (例如: 192.168.1.0 255.255.255.0)</label>
-          <input type="text" class="form-control" id="normalRoute" value="{{.account.Route}}">
+        {{else}}
+        <div class="form-group" id="normalRouteField">
+          <label class="form-label">路由信息</label>
+          <div id="normalRoutesContainer">
+            {{range .account.Routes}}
+            <div class="input-group route-input-group">
+              <input type="text" class="form-control normalRouteInput" value="{{.Route}}" required>
+              <button class="btn btn-outline-danger" type="button" onclick="removeRouteInput(this)">删除</button>
+            </div>
+            {{end}}
+          </div>
+          <button type="button" class="btn btn-sm btn-outline-primary mt-2" onclick="addNormalRouteInput()">
+            添加路由
+          </button>
           <div id="normalRouteError" class="error-message"></div>
         </div>
+        {{end}}
 
+        <!-- 模板选择 -->
         <div class="form-group" id="templateField" {{if .account.IsIRoute}}style="display: none;"{{end}}>
           <label for="templateId" class="form-label">选择模板</label>
-          <select class="form-control" id="templateId">
-            <option value="">不使用模板</option>
+          <select class="form-select" id="templateId" multiple>
             {{range .templates}}
-            <option value="{{.ID}}" {{if eq $.account.TemplateID .ID}}selected{{end}}>{{.Name}} ({{.Type}} - {{len .IRoutes}}个路由)</option>
+            <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Name}}</option>
             {{end}}
           </select>
         </div>
 
+        <!-- IRoute账号关联 -->
         <div class="form-group" id="irouteSelectionField" {{if or (.account.IsIRoute) (.account.TemplateID)}}style="display: none;"{{end}}>
-          <label class="form-label">选择关联的IRoute路由</label>
-          <div class="form-check form-check-inline" style="max-height: 200px; overflow-y: auto; display: block;">
+          <label for="iroutes" class="form-label">关联IRoute账号</label>
+          <select class="form-select" id="iroutes" multiple>
             {{range .irouteAccounts}}
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="iroute_{{.ID}}" value="{{.ID}}" {{if .Selected}}checked{{end}}>
-              <label class="form-check-label" for="iroute_{{.ID}}">
-                {{.Username}} ({{.IRouteValue}})
-              </label>
-            </div>
+            <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.DisplayName}}</option>
             {{end}}
-          </div>
+          </select>
         </div>
 
+        <!-- 账号状态 -->
         <div class="form-group">
-          <label class="form-label">账号状态</label>
           <div class="form-check">
             <input class="form-check-input" type="checkbox" id="enabled" {{if .account.Enabled}}checked{{end}}>
-            <label class="form-check-label" for="enabled">
-              启用此账号
-            </label>
+            <label class="form-check-label" for="enabled">启用此账号</label>
           </div>
         </div>
       </div>
     </div>
 
-    <div class="mt-4">
+    <!-- 操作按钮 -->
+    <div class="mt-4 text-end">
+      <a href="/accounts" class="btn btn-outline-danger me-2">
+        <i class="bi bi-x-circle"></i> 取消
+      </a>
       <button type="submit" class="btn btn-primary">保存</button>
-      <a href="/accounts" class="btn btn-secondary">取消</a>
     </div>
   </form>
 </div>
 
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/js/select2.min.js"></script>
 <script>
-  // 显示错误信息
+  function addIRouteRouteInput() {
+    $('#irouteRoutesContainer').append(`
+            <div class="input-group route-input-group">
+                <input type="text" class="form-control irouteRouteInput" placeholder="10.8.0.0 255.255.255.0" required>
+                <button class="btn btn-outline-danger" type="button" onclick="removeRouteInput(this)">删除</button>
+            </div>
+        `);
+  }
+
+  function addNormalRouteInput() {
+    $('#normalRoutesContainer').append(`
+            <div class="input-group route-input-group">
+                <input type="text" class="form-control normalRouteInput" placeholder="192.168.1.0 255.255.255.0" required>
+                <button class="btn btn-outline-danger" type="button" onclick="removeRouteInput(this)">删除</button>
+            </div>
+        `);
+  }
+  function removeRouteInput(button) {
+    $(button).closest('.input-group').remove();
+  }
+  $(document).ready(function() {
+    // 初始化Select2
+    $('#templateId, #iroutes').select2({
+      theme: 'bootstrap-5',
+      placeholder: '请选择...',
+      allowClear: true
+    });
+  });
+
+  // 路由操作函数
+
+
+  // 表单验证和提交
+  $('#editAccountForm').submit(function(e) {
+    e.preventDefault();
+    $('.error-message').hide();
+
+    // 获取表单数据
+    const formData = {
+      username: $('#usernameHidden').val(),
+      password: $('#password').val(),
+      display_name: $('#displayName').val().trim(),
+      email: $('#email').val().trim(),
+      phone: $('#phone').val().trim(),
+      is_iroute: $('#irouteType').is(':checked'),
+      enabled: $('#enabled').is(':checked'),
+      template_ids: $('#templateId').val() || [],
+      iroute_ids: $('#iroutes').val() || [],
+      routes: []
+    };
+
+    // 验证必填字段
+    let isValid = true;
+    if (!formData.display_name) {
+      showError('displayNameError', '中文名称不能为空');
+      isValid = false;
+    }
+    if (!formData.email) {
+      showError('emailError', '邮箱不能为空');
+      isValid = false;
+    } else if (!validateEmail(formData.email)) {
+      showError('emailError', '邮箱格式不正确');
+      isValid = false;
+    }
+    if (!formData.phone) {
+      showError('phoneError', '手机号不能为空');
+      isValid = false;
+    } else if (!validatePhone(formData.phone)) {
+      showError('phoneError', '手机号格式不正确');
+      isValid = false;
+    }
+
+    // 收集并验证路由
+    const routeSelector = formData.is_iroute ? '.irouteRouteInput' : '.normalRouteInput';
+    const errorElement = formData.is_iroute ? 'irouteRouteError' : 'normalRouteError';
+
+    $(routeSelector).each(function() {
+      const route = $(this).val().trim();
+      if (route) {
+        if (!validateRoute(route)) {
+          showError(errorElement, '路由格式不正确，应为 "IP地址 子网掩码"');
+          isValid = false;
+        }
+        formData.routes.push({route: route});
+      }
+    });
+
+    if (formData.routes.length === 0) {
+      showError(errorElement, '至少需要添加一个路由');
+      isValid = false;
+    }
+
+    if (!isValid) return;
+
+    // 提交数据
+    fetch('/api/accounts', {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify(formData)
+    })
+            .then(response => response.json())
+            .then(data => {
+              if (data.error) {
+                alert('保存失败: ' + data.error);
+              } else {
+                alert('账号更新成功');
+                window.location.href = '/accounts';
+              }
+            })
+            .catch(error => {
+              alert('保存失败: ' + error.message);
+            });
+  });
+
+  // 验证函数
+  function validateEmail(email) {
+    const re = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    return re.test(email);
+  }
+
+  function validatePhone(phone) {
+    const re = /^1[3-9]\d{9}$/;
+    return re.test(phone);
+  }
+
+  function validateRoute(route) {
+    const re = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
+    return re.test(route);
+  }
+
   function showError(elementId, message) {
     const element = document.getElementById(elementId);
     element.textContent = message;
     element.style.display = 'block';
   }
 
-  // 隐藏错误信息
-  function hideError(elementId) {
-    const element = document.getElementById(elementId);
-    element.style.display = 'none';
-  }
-
-  // 验证邮箱格式
-  function validateEmail(email) {
-    const re = /^[a-z0-9._%+\-]+@[a-z0-9.\-]+\.[a-z]{2,4}$/;
-    return re.test(email);
-  }
-
-  // 验证手机号格式
-  function validatePhone(phone) {
-    const re = /^1[3-9]\d{9}$/;
-    return re.test(phone);
-  }
-
-  // 验证路由格式
-  function validateRoute(route) {
-    const re = /^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3} \d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$/;
-    return re.test(route);
-  }
-
-  // 监听账号类型变化
-  document.getElementById('irouteType').addEventListener('change', function() {
-    document.getElementById('irouteRouteField').style.display = this.checked ? 'block' : 'none';
-    document.getElementById('normalRouteField').style.display = this.checked ? 'none' : 'block';
-    document.getElementById('templateField').style.display = this.checked ? 'none' : 'block';
-    document.getElementById('irouteSelectionField').style.display = this.checked ? 'none' : 'block';
-
-    // 如果切换到IRoute类型，清空并禁用模板和IRoute选择
-    if (this.checked) {
-      document.getElementById('templateId').value = '';
-      document.querySelectorAll('#irouteSelectionField input[type="checkbox"]').forEach(checkbox => {
-        checkbox.checked = false;
-      });
+  document.querySelector('.btn-secondary').addEventListener('click', function(e) {
+    if(!confirm('确定要取消编辑吗？所有未保存的更改将会丢失。')) {
+      e.preventDefault();
     }
-  });
-
-  document.getElementById('normalType').addEventListener('change', function() {
-    document.getElementById('irouteRouteField').style.display = this.checked ? 'none' : 'block';
-    document.getElementById('normalRouteField').style.display = this.checked ? 'block' : 'none';
-    document.getElementById('templateField').style.display = this.checked ? 'block' : 'none';
-    document.getElementById('irouteSelectionField').style.display = this.checked ? 'block' : 'none';
-
-    // 如果切换到普通类型，检查是否有模板选中
-    if (this.checked) {
-      updateIRouteSelectionBasedOnTemplate();
-    }
-  });
-
-  // 监听模板选择变化
-  document.getElementById('templateId').addEventListener('change', function() {
-    updateIRouteSelectionBasedOnTemplate();
-  });
-
-  // 根据模板选择更新IRoute选择状态
-  function updateIRouteSelectionBasedOnTemplate() {
-    const templateId = document.getElementById('templateId').value;
-    const irouteCheckboxes = document.querySelectorAll('#irouteSelectionField input[type="checkbox"]');
-
-    // 如果选择了模板，禁用IRoute选择
-    if (templateId) {
-      irouteCheckboxes.forEach(checkbox => {
-        checkbox.disabled = true;
-        checkbox.checked = false;
-      });
-      document.getElementById('irouteSelectionField').style.display = 'none';
-    } else {
-      irouteCheckboxes.forEach(checkbox => {
-        checkbox.disabled = false;
-      });
-      document.getElementById('irouteSelectionField').style.display = 'block';
-    }
-  }
-
-  // 提交表单
-  document.getElementById('editAccountForm').addEventListener('submit', function(e) {
-    e.preventDefault();
-
-    // 清除所有错误信息
-    const errorElements = document.querySelectorAll('.error-message');
-    errorElements.forEach(el => el.style.display = 'none');
-
-    // 验证表单
-    const username = document.getElementById('usernameHidden').value;
-    const password = document.getElementById('password').value;
-    const displayName = document.getElementById('displayName').value.trim();
-    const email = document.getElementById('email').value.trim();
-    const phone = document.getElementById('phone').value.trim();
-    const isIRoute = document.getElementById('irouteType').checked;
-    let route = '';
-
-    if (displayName === '') {
-      showError('displayNameError', '中文名称不能为空');
-      return;
-    }
-
-    if (email === '') {
-      showError('emailError', '邮箱不能为空');
-      return;
-    } else if (!validateEmail(email)) {
-      showError('emailError', '邮箱格式不正确');
-      return;
-    }
-
-    if (phone === '') {
-      showError('phoneError', '手机号不能为空');
-      return;
-    } else if (!validatePhone(phone)) {
-      showError('phoneError', '手机号格式不正确');
-      return;
-    }
-
-    if (isIRoute) {
-      route = document.getElementById('irouteRoute').value.trim();
-      if (route === '') {
-        showError('irouteRouteError', 'IRoute账号需要填写路由信息');
-        return;
-      } else if (!validateRoute(route)) {
-        showError('irouteRouteError', '路由格式不正确，应为 "IP地址 子网掩码"');
-        return;
-      }
-    } else {
-      route = document.getElementById('normalRoute').value.trim();
-      if (route === '') {
-        showError('normalRouteError', '普通账号需要填写路由信息');
-        return;
-      } else if (!validateRoute(route)) {
-        showError('normalRouteError', '路由格式不正确，应为 "IP地址 子网掩码"');
-        return;
-      }
-    }
-
-    // 构建账号数据
-    const accountData = {
-      username: username,
-      password: password, // 留空则不修改
-      display_name: displayName,
-      email: email,
-      phone: phone,
-      is_iroute: isIRoute,
-      route: route,
-      i_route_value: isIRoute ? route : '',
-      enabled: document.getElementById('enabled').checked
-    };
-
-    // 处理模板和IRoute关联
-    if (!isIRoute) {
-      const templateId = document.getElementById('templateId').value;
-      if (templateId) {
-        accountData.template_id = parseInt(templateId);
-      } else {
-        // 获取选中的IRoute账号
-        const selectedIRouteIds = [];
-        document.querySelectorAll('#irouteSelectionField input[type="checkbox"]:checked').forEach(checkbox => {
-          selectedIRouteIds.push(parseInt(checkbox.value));
-        });
-
-        if (selectedIRouteIds.length === 0) {
-          alert('普通账号必须选择至少一个IRoute路由或关联一个模板');
-          return;
-        }
-      }
-    }
-
-    // 提交数据
-    fetch('/api/accounts', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(accountData)
-    })
-            .then(response => response.json())
-            .then(data => {
-              if (data.message) {
-                alert(data.message);
-                window.location.href = '/accounts';
-              } else {
-                alert(data.error || "保存失败");
-              }
-            })
-            .catch(error => {
-              alert("保存失败: " + error.message);
-            });
   });
 </script>
 </body>

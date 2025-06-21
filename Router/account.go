@@ -1,31 +1,140 @@
 package Router
 
 import (
+	"fmt"
 	"github.com/gin-gonic/gin"
+	"gorm.io/gorm"
 	"net/http"
 	"openvpn-ccd/model"
 )
 
 func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
-	// 创建或更新账号
+
 	api.POST("/accounts", func(c *gin.Context) {
-		var account model.Account
-		if err := c.ShouldBindJSON(&account); err != nil {
+		// 创建或更新账号
+		var Account struct {
+			Username    string   `json:"username"`
+			Password    string   `json:"password"`
+			DisplayName string   `json:"display_name"`
+			Email       string   `json:"email"`
+			Phone       string   `json:"phone"`
+			IsIRoute    bool     `json:"is_iroute"`
+			Enabled     bool     `json:"enabled"`
+			Routes      []string `json:"routes"`
+			TemplateIDs []string `json:"template_ids"`
+			IrouteIDs   []string `json:"iroute_ids"`
+		}
+		if err := c.ShouldBindJSON(&Account); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 			return
 		}
-
+		var TemplateIDsUints []uint
+		var IrouteIDsrUnits []uint
+		for _, templateID := range Account.TemplateIDs {
+			var templateIDUint uint
+			if _, err := fmt.Sscanf(templateID, "%d", &templateIDUint); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "无效的模板ID"})
+				return
+			}
+			TemplateIDsUints = append(TemplateIDsUints, templateIDUint)
+		}
+		for _, IrouteID := range Account.IrouteIDs {
+			var IrouteIDsrUnit uint
+			if _, err := fmt.Sscanf(IrouteID, "%d", &IrouteIDsrUnit); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "无效的模板ID"})
+				return
+			}
+			IrouteIDsrUnits = append(IrouteIDsrUnits, IrouteIDsrUnit)
+		}
+		// 转换为模型结构
+		newAccount := model.Account{
+			Model:       gorm.Model{},
+			Username:    Account.Username,
+			Password:    Account.Password,
+			DisplayName: Account.DisplayName,
+			Email:       Account.Email,
+			Phone:       Account.Phone,
+			IsIRoute:    Account.IsIRoute,
+			Enabled:     Account.Enabled,
+			// 需要将routes转换为模型中的Route结构
+		}
+		newAccount.Routes = make([]model.Route, len(Account.Routes))
+		for i, route := range Account.Routes {
+			newAccount.Routes[i] = model.Route{Route: route}
+		}
 		user, _ := c.Get("username")
 		username := user.(string)
 
-		if err := ccdManager.CreateOrUpdateAccount(account, username); err != nil {
+		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, IrouteIDsrUnits); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "账号创建/更新成功"})
 	})
+	api.PUT("/accounts", func(c *gin.Context) {
+		var Account struct {
+			Username    string   `json:"username"`
+			Password    string   `json:"password"`
+			DisplayName string   `json:"display_name"`
+			Email       string   `json:"email"`
+			Phone       string   `json:"phone"`
+			IsIRoute    bool     `json:"is_iroute"`
+			Enabled     bool     `json:"enabled"`
+			Routes      []string `json:"routes"`
+			TemplateIDs []string `json:"template_ids"`
+			IrouteIDs   []string `json:"iroute_ids"`
+		}
+		var account model.Account
+		if err := c.ShouldBindJSON(&account); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			return
+		}
+		var TemplateIDsUints []uint
+		var IrouteIDsrUnits []uint
+		for _, templateID := range Account.TemplateIDs {
+			var templateIDUint uint
+			if _, err := fmt.Sscanf(templateID, "%d", &templateIDUint); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "无效的模板ID"})
+				return
+			}
+			TemplateIDsUints = append(TemplateIDsUints, templateIDUint)
+		}
+		for _, IrouteID := range Account.IrouteIDs {
+			var IrouteIDsrUnit uint
+			if _, err := fmt.Sscanf(IrouteID, "%d", &IrouteIDsrUnit); err != nil {
+				c.JSON(http.StatusBadRequest, gin.H{"error": "无效的模板ID"})
+				return
+			}
+			IrouteIDsrUnits = append(IrouteIDsrUnits, IrouteIDsrUnit)
+		}
+		// 转换为模型结构
+		newAccount := model.Account{
+			Model:       gorm.Model{},
+			Username:    Account.Username,
+			Password:    Account.Password,
+			DisplayName: Account.DisplayName,
+			Email:       Account.Email,
+			Phone:       Account.Phone,
+			IsIRoute:    Account.IsIRoute,
+			Enabled:     Account.Enabled,
+			// 需要将routes转换为模型中的Route结构
+		}
+		newAccount.Routes = make([]model.Route, len(Account.Routes))
+		for i, route := range Account.Routes {
+			newAccount.Routes[i] = model.Route{Route: route}
+		}
 
+		user, _ := c.Get("username")
+		username := user.(string)
+
+		if err := ccdManager.CreateOrUpdateAccount(account, username, c, IrouteIDsrUnits, TemplateIDsUints); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{"message": "账号创建/更新成功"})
+	})
 	// 删除账号
 	api.DELETE("/accounts/:username", func(c *gin.Context) {
 		username := c.Param("username")

@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>添加模板</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
   <!-- 添加Select2 CSS -->
-  <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-  <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+  <link href="/static/css/select2.min.css" rel="stylesheet" />
+  <link href="/static/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
   <style>
     .error-message {
       color: red;
@@ -104,8 +104,8 @@
   </form>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/js/select2.min.js"></script>
 <script>
   // 初始化Select2
   $(document).ready(function() {
@@ -145,7 +145,7 @@
       return;
     }
     const selectedIRouteIds = $('#iroutes').val().map(id => parseInt(id));
-    console.log(selectedIRouteIds);
+    //console.log(selectedIRouteIds);
     if (selectedIRouteIds.length === 0) {
       showError('iroutesError', '请至少选择一个IRoute路由');
       return;

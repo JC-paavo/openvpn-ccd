@@ -3,6 +3,7 @@ package model
 import (
 	"errors"
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"log"
@@ -35,7 +36,7 @@ func NewCCDManager(ccdDir string, db *gorm.DB, logger *log.Logger) *CCDManager {
 }
 
 // 创建或更新账号配置
-func (m *CCDManager) CreateOrUpdateAccount(account Account, user string) error {
+func (m *CCDManager) CreateOrUpdateAccount(account Account, user string, c *gin.Context, IrouteIDs, TemplateIDs []uint) error {
 	// 验证邮箱格式
 	if !validateEmail(account.Email) {
 		return fmt.Errorf("邮箱格式不正确")
@@ -65,62 +66,109 @@ func (m *CCDManager) CreateOrUpdateAccount(account Account, user string) error {
 	}
 
 	var existing Account
+	var templates []Template
+	m.db.Where("id in ?", TemplateIDs).First(&templates)
 	result := m.db.Where("username = ?", account.Username).First(&existing)
 
-	if result.Error != nil {
-		if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
-			return fmt.Errorf("查询账号失败: %v", result.Error)
+	switch c.Request.Method {
+	case "POST": // 创建新账号
+		if result.Error != nil {
+			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("查询账号失败: %v", result.Error)
+			}
 		}
-		// 创建新账号
-		if err := m.db.Create(&account).Error; err != nil {
-			return fmt.Errorf("创建账号失败: %v", err)
+		if result.RowsAffected != 0 {
+			return fmt.Errorf("账号已存在")
 		}
-		m.logger.Printf("用户 %s 创建了账号: %s", user, account.Username)
-	} else {
+		if account.IsIRoute {
+			if err := m.db.Create(&account).Error; err != nil {
+				return fmt.Errorf("创建iroute账号失败: %v", err)
+			}
+			m.logger.Printf("用户 %s 创建了iroute账号: %s", user, account.Username)
+		} else {
+			account.Templates = templates
+			if err := m.db.Create(&account).Error; err != nil {
+				return fmt.Errorf("创建普通账号失败: %v", err)
+			}
+			m.logger.Printf("用户 %s 创建了普通账号: %s", user, account.Username)
+		}
+		// 生成并写入CCD配置文件
+
+	case "PUT":
+		if result.Error != nil {
+			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
+				return fmt.Errorf("查询账号不存在，请创建新账号: %v", result.Error)
+			} else {
+				return fmt.Errorf("查询账号失败: %v", result.Error)
+			}
+		}
 		// 更新现有账号
 		account.ID = existing.ID
 		if account.Password == "" {
 			account.Password = existing.Password // 保持原有密码
 		}
+		if account.IsIRoute {
+			//先拿到和这个iroute user关联的account
+			var tmpaccount []Account
+			m.db.Preload("Routes.Accounts").Where("id = ?", account.ID).Find(&tmpaccount)
+			// 先清空现有的关联
+			if err := m.db.Model(&account).Association("Routes").Clear(); err != nil {
+				return fmt.Errorf("清除模板Irouter useer路由关联失败: %v", err)
+			}
+			if err := m.db.Save(&account).Error; err != nil {
+				return fmt.Errorf("更新账号失败: %v", err)
+			}
+			for acc := range tmpaccount[0].Routes {
+				if err := m.db.Model(&acc).Association("Routes").Append(&account.Routes); err != nil {
+					return fmt.Errorf("更新账号失败: %v", err)
+				}
+			}
+
+		}
+		// 先清空现有的关联
+		if err := m.db.Model(&account).Association("Routes").Clear(); err != nil {
+			return fmt.Errorf("清除模板Iroutel路由关联失败: %v", err)
+		}
+		if err := m.db.Model(&account).Association("Templates").Clear(); err != nil {
+			return fmt.Errorf("清除模板Iroutel路由关联失败: %v", err)
+		}
 		if err := m.db.Save(&account).Error; err != nil {
 			return fmt.Errorf("更新账号失败: %v", err)
 		}
-		m.logger.Printf("用户 %s 更新了账号: %s", user, account.Username)
-	}
 
-	// 管理IRoute关联
-	// 清除旧的关联
-	if err := m.db.Where("account_id = ?", account.ID).Delete(&AccountRoute{}).Error; err != nil {
-		return fmt.Errorf("清除账号IRoute关联失败: %v", err)
-	}
+		//处理iroute 和template关联
 
-	// 添加新的关联
-	if len(account.Templates) != 0 {
-		// 从模板获取IRoutes
-		var template Template
-		for _, tpl := range account.Templates {
-			if err := m.db.Preload("Routes").First(&template, tpl.ID).Error; err != nil {
-				return fmt.Errorf("获取模板失败: %v", err)
-			}
+		var iroutes []Route
+		if err := m.db.Joins("JOIN account_routes ON account_routes.route_id = routes.id").
+			Where("account_routes.account_id IN ?", IrouteIDs).
+			Preload("Accounts", "id IN ?", IrouteIDs).
+			Find(&iroutes).Error; err != nil {
+			return fmt.Errorf("查询IRoute失败: %v", err)
+		}
+		// 建立a2r新的关联
+		if err := m.db.Model(&account).Association("Routes").Append(iroutes); err != nil {
+			return fmt.Errorf("添加模板IRoute关联失败: %v", err)
 		}
 
-		for _, ir := range template.Routes {
-			accountIRoute := AccountRoute{
-				AccountID: account.ID,
-				RouteID:   ir.ID,
-			}
-			if err := m.db.Create(&accountIRoute).Error; err != nil {
-				return fmt.Errorf("添加账号IRoute关联失败: %v", err)
-			}
+		// 建立a2t新的关联
+		var tpl []Template
+		m.db.Where("id in ?", TemplateIDs).Find(&tpl)
+		if err := m.db.Model(&account).Association("Templates").Append(tpl); err != nil {
+			return fmt.Errorf("添加账号模板关联失败: %v", err)
 		}
-	}
 
-	// 生成并写入CCD配置文件
+	}
+	var newAccount Account
 	if account.Enabled {
-		return m.generateCCDConfig(account)
+		if err := m.db.Preload("Routes").Preload("Templates.Routes").Where("username =?", account.Username).First(&newAccount).Error; err != nil {
+			return fmt.Errorf("查询账号失败: %v", err)
+		}
+		return m.generateCCDConfig(newAccount)
 	} else {
 		return m.deleteCCDConfig(account.Username)
 	}
+
+	return nil
 }
 
 // 删除账号
@@ -156,9 +204,45 @@ func (m *CCDManager) GetAccount(username string) (Account, error) {
 // 获取所有账号
 func (m *CCDManager) GetAllAccounts() ([]Account, error) {
 	var accounts []Account
-	if err := m.db.Preload("Routes").Preload("Templates").Find(&accounts).Error; err != nil {
+	if err := m.db.Preload("Routes.Accounts").Preload("Templates").Find(&accounts).Error; err != nil {
 		return nil, err
 	}
+	// 为每个账号添加关联信息
+	for i := range accounts {
+		// 1. 普通账号的iroute关联账号列表
+		if !accounts[i].IsIRoute {
+			irouteAccounts := make(map[uint]string)
+			for _, route := range accounts[i].Routes {
+				for _, acc := range route.Accounts {
+					if acc.IsIRoute {
+						irouteAccounts[acc.ID] = acc.DisplayName
+					}
+				}
+			}
+			accounts[i].IRouteAccounts = irouteAccounts
+		}
+
+		// 2. IRoute账号被哪些模板关联的模板名称列表
+		if accounts[i].IsIRoute {
+			referencedTemplates := make(map[uint]string)
+			var allTemplates []Template
+			if err := m.db.Preload("Routes.Accounts").Find(&allTemplates).Error; err == nil {
+				for _, tpl := range allTemplates {
+					for _, route := range tpl.Routes {
+						for _, acc := range route.Accounts {
+							if acc.ID == accounts[i].ID {
+								referencedTemplates[tpl.ID] = tpl.Name
+								//referencedTemplates = append(referencedTemplates, tpl.Name)
+								break
+							}
+						}
+					}
+				}
+			}
+			accounts[i].ReferencedTemplateNames = referencedTemplates
+		}
+	}
+
 	return accounts, nil
 }
 
@@ -172,12 +256,12 @@ func (m *CCDManager) GetAllIRouteAccounts() ([]Account, error) {
 }
 
 // 获取所有IRoute路由
-func (m *CCDManager) GetAllIRoutes() ([]Account, error) {
-	var iroutes []Account
-	if err := m.db.Preload("Routes").Where("is_iroute=? and enabled=?", true, true).Find(&iroutes).Error; err != nil {
+func (m *CCDManager) GetAllIRoutesAccount() ([]Account, error) {
+	var Accounts []Account
+	if err := m.db.Preload("Routes").Where("is_iroute=? and enabled=?", true, true).Find(&Accounts).Error; err != nil {
 		return nil, err
 	}
-	return iroutes, nil
+	return Accounts, nil
 }
 
 // 生成CCD配置文件
@@ -192,7 +276,7 @@ func (m *CCDManager) generateCCDConfig(account Account) error {
 	// IRoute账号配置
 	if account.IsIRoute {
 		for _, route := range account.Routes {
-			if _, err := file.WriteString(fmt.Sprintf("iroute %s\n", route)); err != nil {
+			if _, err := file.WriteString(fmt.Sprintf("iroute %s\n", route.Route)); err != nil {
 				return fmt.Errorf("写入配置文件失败: %v", err)
 			}
 		}
@@ -202,23 +286,14 @@ func (m *CCDManager) generateCCDConfig(account Account) error {
 
 	// 普通账号配置 - 添加路由和关联iroute
 	if len(account.Routes) != 0 {
-		for _, route := range account.Routes {
-			if _, err := file.WriteString(fmt.Sprintf("push \"route %s\"\n", route)); err != nil {
-				return fmt.Errorf("写入配置文件失败: %v", err)
-			}
-		}
+		return writeRoute(account.Routes, file)
 	}
+	if len(account.Templates) != 0 {
 
-	// 添加账号关联的所有IRoute路由
-	var iroutes []Route
-	if err := m.db.Model(&account).Association("Routes").Find(&iroutes); err != nil {
-		return fmt.Errorf("获取账号关联的IRoute路由失败: %v", err)
-	}
-
-	for _, iroute := range iroutes {
-		if _, err := file.WriteString(fmt.Sprintf("push \"route %s\"\n", iroute.Route)); err != nil {
-			return fmt.Errorf("写入配置文件失败: %v", err)
+		if err := writeTemplateRoute(account.Templates, file); err != nil {
+			return err
 		}
+
 	}
 
 	return nil
@@ -238,6 +313,26 @@ func (m *CCDManager) deleteCCDConfig(username string) error {
 // 获取配置文件路径
 func (m *CCDManager) getConfigPath(username string) string {
 	return filepath.Join(m.ccdDir, username)
+}
+
+// 批量写push route
+func writeRoute(routes []Route, file *os.File) error {
+	for _, route := range routes {
+		if _, err := file.WriteString(fmt.Sprintf("push \"route %s\"\n", route.Route)); err != nil {
+			return fmt.Errorf("写入配置文件失败: %v", err)
+		}
+	}
+	return nil
+}
+func writeTemplateRoute(tpls []Template, file *os.File) error {
+	for _, tpl := range tpls {
+		for _, route := range tpl.Routes {
+			if _, err := file.WriteString(fmt.Sprintf("push \"route %s\"\n", route.Route)); err != nil {
+				return fmt.Errorf("写入配置文件失败: %v", err)
+			}
+		}
+	}
+	return nil
 }
 
 // 密码加密
@@ -274,15 +369,21 @@ func validateCIDR(cidr string) bool {
 func (m *CCDManager) CreateOrUpdateTemplate(template Template, irouteIDs []uint, user, method string) error {
 
 	var existing Template
+	var iroutes []Account
 	result := m.db.Where("name = ?", template.Name).First(&existing)
+	m.db.Preload("Routes").Where("id in ?", irouteIDs).Find(&iroutes)
 
 	switch method {
 	case "POST":
 		if result.Error != nil {
 			if !errors.Is(result.Error, gorm.ErrRecordNotFound) {
+
 				return fmt.Errorf("查询模板失败: %v", result.Error)
 			}
 			// 创建新模板
+			for _, iroute := range iroutes {
+				template.Routes = append(template.Routes, iroute.Routes...)
+			}
 			if err := m.db.Create(&template).Error; err != nil {
 				return fmt.Errorf("创建模板失败: %v", err)
 			}
@@ -300,29 +401,30 @@ func (m *CCDManager) CreateOrUpdateTemplate(template Template, irouteIDs []uint,
 			if err := m.db.Save(&template).Error; err != nil {
 				return fmt.Errorf("更新模板失败: %v", err)
 			}
+			// 先清空现有的关联
+			if err := m.db.Model(&template).Association("Routes").Clear(); err != nil {
+				return fmt.Errorf("清除模板IRoute关联失败: %v", err)
+			}
+
+			// 准备要关联的 Route 实例
+			var routes []Route
+			if err := m.db.Joins("JOIN account_routes ON account_routes.route_id = routes.id").
+				Where("account_routes.account_id IN ?", irouteIDs).
+				Preload("Accounts", "id IN ?", irouteIDs).
+				Find(&routes).Error; err != nil {
+				return fmt.Errorf("查询IRoute失败: %v", err)
+			}
+			// 建立新的关联
+			if err := m.db.Model(&template).Association("Routes").Append(routes); err != nil {
+				return fmt.Errorf("添加模板IRoute关联失败: %v", err)
+			}
+			// 更新所有使用此模板的账号配置
 			m.logger.Printf("用户 %s 更新了模板: %s", user, template.Name)
-		}
-	}
 
-	// 清除旧的IRoute关联
-	if err := m.db.Where("template_id = ?", template.ID).Delete(&TemplateRoute{}).Error; err != nil {
-		return fmt.Errorf("清除模板IRoute关联失败: %v", err)
-	}
-
-	// 添加新的IRoute关联
-	for _, irouteID := range irouteIDs {
-		templateIRoute := TemplateRoute{
-			TemplateID: template.ID,
-			RouteID:    irouteID,
+			if err := m.updateAccountsByTemplate(template.ID); err != nil {
+				return fmt.Errorf("更新模板关联的账号配置失败: %v", err)
+			}
 		}
-		if err := m.db.Create(&templateIRoute).Error; err != nil {
-			return fmt.Errorf("添加模板IRoute关联失败: %v", err)
-		}
-	}
-
-	// 更新所有使用此模板的账号配置
-	if err := m.updateAccountsByTemplate(template.ID); err != nil {
-		return fmt.Errorf("更新模板关联的账号配置失败: %v", err)
 	}
 
 	return nil
@@ -332,27 +434,45 @@ func (m *CCDManager) CreateOrUpdateTemplate(template Template, irouteIDs []uint,
 func (m *CCDManager) DeleteTemplate(id uint, user string) error {
 	// 检查是否有账号使用此模板
 	var count int64
-	if err := m.db.Model(&Account{}).Where("template_id = ?", id).Count(&count).Error; err != nil {
+	if err := m.db.Model(&Account{}).
+		Joins("JOIN account_templates ON account_templates.account_id = accounts.id").
+		Where("account_templates.template_id = ?", id).Count(&count).Error; err != nil {
 		return fmt.Errorf("检查模板使用情况失败: %v", err)
 	}
 
 	if count > 0 {
-		return fmt.Errorf("模板正在被使用，无法删除")
+		fmt.Println(count)
+		return fmt.Errorf("模板正在被用户使用，无法删除")
+	}
+
+	var count2 int64
+	if err := m.db.Model(&Route{}).
+		Joins("JOIN template_routes ON template_routes.route_id = routes.id").
+		Where("template_routes.template_id = ?", id).Count(&count2).Error; err != nil {
+		return fmt.Errorf("检查模板使用情况失败: %v", err)
+	}
+	if count2 > 0 {
+		return fmt.Errorf("模板正在被iroute用户关联使用，无法删除")
 	}
 
 	// 删除模板
 	var template Template
-	if err := m.db.First(&template, id).Error; err != nil {
+	if err := m.db.Preload("Accounts").Preload("Routes").First(&template, id).Error; err != nil {
 		return fmt.Errorf("查询模板失败: %v", err)
 	}
 
+	//// 清除与普通账号的关联
+	//if err := m.db.Model(&template).Association("Assounts").Clear().Error; err != nil {
+	//	return fmt.Errorf("清除模板普通账号关联失败: %v", err)
+	//}
+	//
+	////清除与路由的关联
+	//if err := m.db.Model(&template).Association("Routes").Clear().Error; err != nil {
+	//	return fmt.Errorf("清除模板route关联失败: %v", err)
+	//}
+
 	if err := m.db.Delete(&template).Error; err != nil {
 		return fmt.Errorf("删除模板失败: %v", err)
-	}
-
-	// 清除模板IRoute关联
-	if err := m.db.Where("template_id = ?", id).Delete(&TemplateRoute{}).Error; err != nil {
-		return fmt.Errorf("清除模板IRoute关联失败: %v", err)
 	}
 
 	m.logger.Printf("用户 %s 删除了模板: %s", user, template.Name)
@@ -362,7 +482,7 @@ func (m *CCDManager) DeleteTemplate(id uint, user string) error {
 // 获取模板
 func (m *CCDManager) GetTemplate(id uint) (Template, error) {
 	var template Template
-	if err := m.db.Preload("Routes").First(&template, id).Error; err != nil {
+	if err := m.db.Preload("Routes.Accounts", "is_iroute=? and enabled=?", true, true).First(&template, id).Error; err != nil {
 		return template, err
 	}
 	return template, nil
@@ -371,7 +491,7 @@ func (m *CCDManager) GetTemplate(id uint) (Template, error) {
 // 获取所有模板
 func (m *CCDManager) GetAllTemplates() ([]Template, error) {
 	var templates []Template
-	if err := m.db.Preload("Routes").Find(&templates).Error; err != nil {
+	if err := m.db.Preload("Accounts").Preload("Routes.Accounts").Find(&templates).Error; err != nil {
 		return nil, err
 	}
 	return templates, nil
@@ -380,7 +500,11 @@ func (m *CCDManager) GetAllTemplates() ([]Template, error) {
 // 更新模板关联的所有账号配置
 func (m *CCDManager) updateAccountsByTemplate(templateID uint) error {
 	var accounts []Account
-	if err := m.db.Where("template_id = ? AND enabled = ?", templateID, true).Find(&accounts).Error; err != nil {
+	if err := m.db.Preload("Templates", "id = ? ", templateID).Preload("Templates.Routes").
+		Preload("Routes").Where("is_iroute=? and enabled = ?", false, true).Find(&accounts).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return fmt.Errorf("无关联账号: %v", err)
+		}
 		return fmt.Errorf("获取模板关联的账号失败: %v", err)
 	}
 
@@ -389,6 +513,5 @@ func (m *CCDManager) updateAccountsByTemplate(templateID uint) error {
 			return fmt.Errorf("更新账号 %s 配置失败: %v", account.Username, err)
 		}
 	}
-
 	return nil
 }

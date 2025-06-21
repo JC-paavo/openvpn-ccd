@@ -3,10 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <title>编辑模板</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
     <!-- 添加Select2 CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/css/select2.min.css" rel="stylesheet" />
-    <link href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
+    <link href="/static/css/select2.min.css" rel="stylesheet" />
+    <link href="/static/css/select2-bootstrap-5-theme.min.css" rel="stylesheet" />
     <style>
         .error-message {
             color: red;
@@ -64,8 +64,8 @@
         <div class="form-group">
             <label class="form-label">选择IRoute路由</label>
             <select class="form-select" id="iroutes" name="iroutes" multiple>
-                {{range .iroutes}}
-                <option value="{{.ID}}" {{if .Selected}}selected{{end}}>{{.Route}} {{if .Account}} ({{.Account.Username}}){{end}}</option>
+                {{range .irouterUsers}}
+                <option value="{{.ID}}" {{if index $.selectedIRouteIDs .ID}}selected{{end}}>{{.DisplayName}}</option>
                 {{end}}
             </select>
             <div id="iroutesError" class="error-message"></div>
@@ -78,7 +78,18 @@
     </form>
 </div>
 
+<script src="/static/js/jquery.min.js"></script>
+<script src="/static/js/select2.min.js"></script>
 <script>
+    // 初始化Select2
+    $(document).ready(function() {
+        $('#iroutes').select2({
+            theme: 'bootstrap-5',
+            placeholder: '请选择IRoute路由',
+            closeOnSelect: false
+        });
+    });
+
     // 显示错误信息
     function showError(elementId, message) {
         const element = document.getElementById(elementId);
@@ -109,18 +120,15 @@
             return;
         }
 
-        // if (type === '') {
-        //     showError('typeError', '请选择模板类型');
-        //     return;
-        // }
 
         // 获取选中的IRoute路由
-        const selectedIRouteIds = $('#iroutes').val().map(id => parseInt(id));
+        const selectedIRouteIds = $('#iroutes').val()?.map(id => parseInt(id)) || [];
+        //const selectedIRouteIds = $('#iroutes').val().map(id => parseInt(id));
 
-        if (selectedIRouteIds.length === 0) {
-            showError('iroutesError', '请至少选择一个IRoute路由');
-            return;
-        }
+        // if (selectedIRouteIds.length === 0) {
+        //     showError('iroutesError', '请至少选择一个IRoute路由');
+        //     return;
+        // }
 
         // 构建模板数据
         const templateData = {
@@ -157,81 +165,5 @@
 </script>
 </body>
 </html>
-
-<script src="https://cdn.jsdelivr.net/npm/jquery@3.6.0/dist/jquery.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/select2@4.1.0-rc.0/dist/js/select2.min.js"></script>
-<script>
-    // 初始化Select2
-    $(document).ready(function() {
-        $('#iroutes').select2({
-            theme: 'bootstrap-5',
-            placeholder: '请选择IRoute路由',
-            closeOnSelect: false
-        });
-    });
-
-    // 修改表单提交处理
-    document.getElementById('editTemplateForm').addEventListener('submit', function(e) {
-        e.preventDefault();
-
-        // 清除所有错误信息
-        const errorElements = document.querySelectorAll('.error-message');
-        errorElements.forEach(el => el.style.display = 'none');
-
-        // 验证表单
-        const name = document.getElementById('name').value.trim();
-        const type = document.getElementById('type').value;
-
-        if (name === '') {
-            showError('nameError', '模板名称不能为空');
-            return;
-        }
-
-        if (type === '') {
-            showError('typeError', '请选择模板类型');
-            return;
-        }
-
-        // 获取选中的IRoute路由
-        const selectedIRouteIds = $('#iroutes').val().map(id => parseInt(id));
-
-        if (selectedIRouteIds.length === 0) {
-            showError('iroutesError', '请至少选择一个IRoute路由');
-            return;
-        }
-
-        // 构建模板数据
-        const templateData = {
-            template: {
-                id: parseInt(document.getElementById('templateId').value),
-                name: name,
-                type: type,
-                description: document.getElementById('description').value
-            },
-            iroute_ids: selectedIRouteIds
-        };
-
-        // 提交数据
-        fetch('/api/templates', {
-            method: 'PUT',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify(templateData)
-        })
-        .then(response => response.json())
-        .then(data => {
-            if (data.message) {
-                alert(data.message);
-                window.location.href = '/templates';
-            } else {
-                alert(data.error || "保存失败");
-            }
-        })
-        .catch(error => {
-            alert("保存失败: " + error.message);
-        });
-    });
-</script>
 </body>
 </html>

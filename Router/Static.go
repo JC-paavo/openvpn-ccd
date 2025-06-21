@@ -2,28 +2,14 @@ package Router
 
 import (
 	"fmt"
-	"github.com/gin-contrib/sessions/cookie"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
-	"html/template"
 	"net/http"
-	"openvpn-ccd/Middle"
 	"openvpn-ccd/model"
 )
 
-func staticRoute(r *gin.Engine, store cookie.Store, ccdManager *model.CCDManager, db *gorm.DB) {
-	// 静态文件服务
-	r.Static("/static", "./static")
-	add := func(a, b int) int {
-		return a + b
-	}
-	r.SetFuncMap(template.FuncMap{
-		"add": add,
-	})
-	r.LoadHTMLGlob("templates/*")
-	// Web界面路由（需要认证）
-	web := r.Group("")
-	web.Use(Middle.AuthMiddleware(store))
+func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB) {
+
 	{
 		// 首页
 		web.GET("/", func(c *gin.Context) {
@@ -35,16 +21,15 @@ func staticRoute(r *gin.Engine, store cookie.Store, ccdManager *model.CCDManager
 				return
 			}
 
-			templates, err := ccdManager.GetAllTemplates()
-			if err != nil {
-				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
-				return
-			}
+			//templates, err := ccdManager.GetAllTemplates()
+			//if err != nil {
+			//	c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+			//	return
+			//}
 
 			c.HTML(http.StatusOK, "index.html", gin.H{
-				"user":      user,
-				"accounts":  accounts,
-				"templates": templates,
+				"user":     user,
+				"accounts": accounts,
 			})
 		})
 
@@ -107,9 +92,23 @@ func staticRoute(r *gin.Engine, store cookie.Store, ccdManager *model.CCDManager
 			user, _ := c.Get("username")
 
 			templates, err := ccdManager.GetAllTemplates()
+
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
+			}
+
+			// 计算每个模板的IRoute账号数量
+			for i := range templates {
+				irouteAccounts := make(map[uint]bool)
+				for _, route := range templates[i].Routes {
+					for _, account := range route.Accounts {
+						if account.IsIRoute {
+							irouteAccounts[account.ID] = true
+						}
+					}
+				}
+				templates[i].IRouteCount = len(irouteAccounts)
 			}
 
 			c.HTML(http.StatusOK, "templates.html", gin.H{
@@ -122,14 +121,16 @@ func staticRoute(r *gin.Engine, store cookie.Store, ccdManager *model.CCDManager
 		web.GET("/template/add", func(c *gin.Context) {
 			user, _ := c.Get("username")
 
-			iroutes, err := ccdManager.GetAllIRoutes()
+			accounts, err := ccdManager.GetAllIRoutesAccount()
+			templates, err := ccdManager.GetAllTemplates()
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
 			}
 			c.HTML(http.StatusOK, "add_template.html", gin.H{
-				"user":    user,
-				"iroutes": iroutes,
+				"user":      user,
+				"iroutes":   accounts,
+				"templates": templates,
 			})
 		})
 
@@ -149,7 +150,7 @@ func staticRoute(r *gin.Engine, store cookie.Store, ccdManager *model.CCDManager
 				return
 			}
 
-			iroutes, err := ccdManager.GetAllIRoutes()
+			Accounts, err := ccdManager.GetAllIRoutesAccount()
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
@@ -157,14 +158,21 @@ func staticRoute(r *gin.Engine, store cookie.Store, ccdManager *model.CCDManager
 
 			// 提取已选择的IRoute ID
 			selectedIRouteIDs := make(map[uint]bool)
-			for _, ir := range template.Routes {
-				selectedIRouteIDs[ir.ID] = true
+			templateAccountIDs := make(map[uint]bool)
+			for _, route := range template.Routes {
+				for _, account := range route.Accounts {
+					if account.IsIRoute {
+						templateAccountIDs[account.ID] = true
+					}
+				}
 			}
-
+			for _, account := range Accounts {
+				selectedIRouteIDs[account.ID] = templateAccountIDs[account.ID]
+			}
 			c.HTML(http.StatusOK, "edit_template.html", gin.H{
 				"user":              user,
 				"template":          template,
-				"iroutes":           iroutes,
+				"irouterUsers":      Accounts,
 				"selectedIRouteIDs": selectedIRouteIDs,
 			})
 		})

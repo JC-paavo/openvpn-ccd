@@ -5,15 +5,17 @@ import "gorm.io/gorm"
 // 账号模型
 type Account struct {
 	gorm.Model
-	Username    string     `gorm:"unique;not null" json:"username"`
-	Password    string     `gorm:"not null" json:"-"` // 不返回密码
-	DisplayName string     `gorm:"not null" json:"display_name"`
-	Email       string     `gorm:"unique;not null" json:"email"`
-	Phone       string     `gorm:"unique;not null" json:"phone"`
-	IsIRoute    bool       `gorm:"default:false;column:is_iroute" json:"is_iroute"`
-	Routes      []Route    `gorm:"default:null;many2many:account_routes;" json:"route"`
-	Enabled     bool       `gorm:"default:true" json:"enabled"`
-	Templates   []Template `gorm:"many2many:account_templates" json:"template,omitempty"`
+	Username                string          `gorm:"unique;not null" json:"username"`
+	Password                string          `gorm:"not null" json:"-"` // 不返回密码
+	DisplayName             string          `gorm:"not null" json:"display_name"`
+	Email                   string          `gorm:"unique;not null" json:"email"`
+	Phone                   string          `gorm:"unique;not null" json:"phone"`
+	IsIRoute                bool            `gorm:"default:false;column:is_iroute" json:"is_iroute"`
+	Routes                  []Route         `gorm:"default:null;many2many:account_routes;" json:"routes"`
+	Enabled                 bool            `gorm:"default:true" json:"enabled"`
+	Templates               []Template      `gorm:"many2many:account_templates" json:"template,omitempty"`
+	IRouteAccounts          map[uint]string `gorm:"-"` // 普通账号关联的IRoute账号列表
+	ReferencedTemplateNames map[uint]string `gorm:"-"` // IRoute账号被哪些模板关联的模板名称列表
 	//IRoutes     []IRoute `gorm:"many2many:account_iroutes;" json:"iroutes,omitempty"`
 }
 
@@ -22,7 +24,7 @@ type Route struct {
 	gorm.Model
 	Route string `gorm:"unique;not null" json:"route"`
 	//	AccountID *uint      `json:"account_id"`
-	Accounts  []Account  `gorm:"many2many:account_templates" json:"accounts"`
+	Accounts  []Account  `gorm:"many2many:account_routes" json:"accounts"`
 	Templates []Template `gorm:"many2many:template_routes;" json:"templates,omitempty"`
 }
 
@@ -32,8 +34,9 @@ type Template struct {
 	Name        string `gorm:"unique;not null" json:"name"`
 	Description string `json:"description"`
 	//Type        string    `json:"type"` // 运维管理员, 开发人员, 项目经理, 技术经理
-	Routes   []Route   `gorm:"many2many:template_routes;" json:"iroutes,omitempty"`
-	Accounts []Account `gorm:"many2many:account_templates" json:"accounts,omitempty"`
+	Routes      []Route   `gorm:"many2many:template_routes;" json:"iroutes,omitempty"`
+	Accounts    []Account `gorm:"many2many:account_templates" json:"accounts,omitempty"`
+	IRouteCount int       `gorm:"-"`
 }
 
 // 日志模型
