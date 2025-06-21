@@ -7,6 +7,7 @@ import (
 	"gorm.io/gorm"
 	"html/template"
 	"log"
+	"math"
 	"openvpn-ccd/Middle"
 	"openvpn-ccd/model"
 	"os"
@@ -48,6 +49,32 @@ func InitRoute(r *gin.Engine, ccdManager *model.CCDManager, db *gorm.DB, logger 
 	}
 	r.SetFuncMap(template.FuncMap{
 		"add": add,
+	})
+	r.SetFuncMap(template.FuncMap{
+		"add":  func(a, b int) int { return a + b },
+		"sub":  func(a, b int) int { return a - b },
+		"mul":  func(a, b int) int { return a * b },
+		"div":  func(a, b int) int { return a / b },
+		"ceil": func(a float64) int { return int(math.Ceil(a)) },
+		"seq": func(start, end int) []int {
+			var seq []int
+			for i := start; i <= end; i++ {
+				seq = append(seq, i)
+			}
+			return seq
+		},
+		"max": func(a, b int) int {
+			if a > b {
+				return a
+			}
+			return b
+		},
+		"min": func(a, b int) int {
+			if a < b {
+				return a
+			}
+			return b
+		},
 	})
 	r.LoadHTMLGlob("templates/*")
 	web := r.Group("")

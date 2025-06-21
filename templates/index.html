@@ -1,308 +1,314 @@
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
-  <meta charset="UTF-8">
-  <title>OpenVPN CCD配置管理</title>
-  <link href="/static/css/bootstrap.min.css" rel="stylesheet">
-  <style>
-    .status-badge {
-      font-size: 0.8em;
-      padding: 0.3em 0.6em;
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; script-src 'self' 'http://172.24.250.120:8080/' ; style-src 'self' 'unsafe-inline'; img-src 'self' data:;font-src 'self' data:">
+    <title>OpenVPN CCD配置管理</title>
+    <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .status-badge {
+            font-size: 0.8em;
+            padding: 0.3em 0.6em;
+        }
+    </style>
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
-  <div class="container">
-    <a class="navbar-brand" href="#">OpenVPN CCD配置管理</a>
-    <div class="collapse navbar-collapse" id="navbarNav">
-      <ul class="navbar-nav">
-        <li class="nav-item active">
-          <a class="nav-link" href="/">首页</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/accounts">账号管理</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/templates">模板管理</a>
-        </li>
-        <li class="nav-item">
-          <a class="nav-link" href="/logs">日志</a>
-        </li>
-      </ul>
-    </div>
-    <div class="navbar-nav">
+    <div class="container">
+        <a class="navbar-brand" href="#">OpenVPN CCD配置管理</a>
+        <div class="collapse navbar-collapse" id="navbarNav">
+            <ul class="navbar-nav">
+                <li class="nav-item active">
+                    <a class="nav-link" href="/">首页</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/accounts">账号管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/templates">模板管理</a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="/logs">日志</a>
+                </li>
+            </ul>
+        </div>
+        <div class="navbar-nav">
                 <span class="navbar-text me-3">
                     欢迎，{{.user}}
                 </span>
-      <a class="nav-link" href="/logout">退出登录</a>
+            <a class="nav-link" href="/logout">退出登录</a>
+        </div>
     </div>
-  </div>
 </nav>
 
 <div class="container mt-5">
-  <div class="row">
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">
-          <h3>账号统计</h3>
+    <div class="row">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3>账号统计</h3>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card text-white bg-primary mb-3">
+                                <div class="card-header">总账号数</div>
+                                <div class="card-body">
+                                    <h5 class="card-title">{{len .accounts}}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card text-white bg-success mb-3">
+                                <div class="card-header">活跃账号</div>
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        {{$count := 0}}
+                                        {{range .accounts}}
+                                        {{if .Enabled}}
+                                        {{$count = add $count 1}}
+                                        {{end}}
+                                        {{end}}
+                                        {{$count}}
+                                    </h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card text-white bg-info mb-3">
+                                <div class="card-header">IRoute账号</div>
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        {{$count := 0}}
+                                        {{range .accounts}}
+                                        {{if and .Enabled .IsIRoute}}
+                                        {{$count = add $count 1}}
+                                        {{end}}
+                                        {{end}}
+                                        {{$count}}
+                                    </h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card text-white bg-warning mb-3">
+                                <div class="card-header">普通账号</div>
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        {{$count := 0}}
+                                        {{range .accounts}}
+                                        {{if and .Enabled (not .IsIRoute)}}
+                                        {{$count = add $count 1}}
+                                        {{end}}
+                                        {{end}}
+                                        {{$count}}
+                                    </h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <div class="card text-white bg-primary mb-3">
-                <div class="card-header">总账号数</div>
-                <div class="card-body">
-                  <h5 class="card-title">{{len .accounts}}</h5>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h3>模板统计</h3>
                 </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="card text-white bg-success mb-3">
-                <div class="card-header">活跃账号</div>
                 <div class="card-body">
-                  <h5 class="card-title">
-                    {{$count := 0}}
-                    {{range .accounts}}
-                    {{if .Enabled}}
-                    {{$count = add $count 1}}
-                    {{end}}
-                    {{end}}
-                    {{$count}}
-                  </h5>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="card text-white bg-secondary mb-3">
+                                <div class="card-header">总模板数</div>
+                                <div class="card-body">
+                                    <h5 class="card-title">{{len .templates}}</h5>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card text-white bg-dark mb-3">
+                                <div class="card-header">正在使用的模板</div>
+                                <div class="card-body">
+                                    <h5 class="card-title">
+                                        {{$count := 0}}
+                                        {{range .templates}}
+                                        {{if gt (len .Accounts) 0}}
+                                        {{$count = add $count 1}}
+                                        {{end}}
+                                        {{end}}
+                                        {{$count}}
+                                    </h5>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-              </div>
             </div>
-            <div class="col-md-6">
-              <div class="card text-white bg-info mb-3">
-                <div class="card-header">IRoute账号</div>
-                <div class="card-body">
-                  <h5 class="card-title">
-                    {{$count := 0}}
-                    {{range .accounts}}
-                    {{if and .Enabled .IsIRoute}}
-                    {{$count = add $count 1}}
-                    {{end}}
-                    {{end}}
-                    {{$count}}
-                  </h5>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="card text-white bg-warning mb-3">
-                <div class="card-header">普通账号</div>
-                <div class="card-body">
-                  <h5 class="card-title">
-                    {{$count := 0}}
-                    {{range .accounts}}
-                    {{if and .Enabled (not .IsIRoute)}}
-                    {{$count = add $count 1}}
-                    {{end}}
-                    {{end}}
-                    {{$count}}
-                  </h5>
-                </div>
-              </div>
-            </div>
-          </div>
         </div>
-      </div>
     </div>
-    <div class="col-md-6">
-      <div class="card">
-        <div class="card-header">
-          <h3>模板统计</h3>
-        </div>
-        <div class="card-body">
-          <div class="row">
-            <div class="col-md-6">
-              <div class="card text-white bg-secondary mb-3">
-                <div class="card-header">总模板数</div>
-                <div class="card-body">
-                  <h5 class="card-title">{{len .templates}}</h5>
-                </div>
-              </div>
-            </div>
-            <div class="col-md-6">
-              <div class="card text-white bg-dark mb-3">
-                <div class="card-header">正在使用的模板</div>
-                <div class="card-body">
-                  <h5 class="card-title">
-                    {{$count := 0}}
-                    {{range .templates}}
-                    {{if gt (len .Accounts) 0}}
-                    {{$count = add $count 1}}
-                    {{end}}
-                    {{end}}
-                    {{$count}}
-                  </h5>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
 
-  <div class="row mt-4">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-header">
-          <h3>最近账号操作</h3>
-          <div class="d-flex justify-content-between">
-            <a href="/account/add" class="btn btn-primary btn-sm">添加账号</a>
-            <a href="/accounts" class="btn btn-outline-secondary btn-sm">查看全部</a>
-          </div>
-        </div>
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead>
-            <tr>
-              <th>用户名</th>
-              <th>中文名称</th>
-              <th>账号类型</th>
-              <th>状态</th>
-              <th>关联模板</th>
-              <th>关联IRoute账号</th>
-              <th>操作</th>
-            </tr>
-            </thead>
-            <tbody>
-            {{range .accounts}}
-            <tr>
-              <td>{{.Username}}</td>
-              <td>{{.DisplayName}}</td>
-              <td>
-                {{if .IsIRoute}}
-                <span class="badge bg-info">IRoute账号</span>
-                {{else}}
-                <span class="badge bg-secondary">普通账号</span>
-                {{end}}
-              </td>
-              <td>
-                {{if .Enabled}}
-                <span class="badge bg-success status-badge">启用</span>
-                {{else}}
-                <span class="badge bg-danger status-badge">禁用</span>
-                {{end}}
-              </td>
-              <td>
-                {{if .TemplateID}}
-                {{.Template.Name}}
-                {{else}}
-                -
-                {{end}}
-              </td>
-              <td>
-                {{if not .IsIRoute}}
-                {{range .IRoutes}}
-                {{if .Account}}
-                <span class="badge bg-primary">{{.Account.Username}}</span>
-                {{end}}
-                {{end}}
-                {{else}}
-                -
-                {{end}}
-              </td>
-              <td>
-                <a href="/account/edit/{{.Username}}" class="btn btn-sm btn-warning">编辑</a>
-                <button class="btn btn-sm btn-danger" onclick="deleteAccount('{{.Username}}')">删除</button>
-              </td>
-            </tr>
-            {{end}}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    </div>
-  </div>
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>最近账号操作</h3>
+                    <div class="d-flex justify-content-between">
+                        <a href="/account/add" class="btn btn-primary btn-sm">添加账号</a>
+                        <a href="/accounts" class="btn btn-outline-secondary btn-sm">查看全部</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>用户名</th>
+                            <th>中文名称</th>
+                            <th>账号类型</th>
+                            <th>状态</th>
+                            <!--              <th>关联模板</th>-->
+                            <!--              <th>关联IRoute账号</th>-->
+                            <!--              <th>操作</th>-->
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {{range .accounts}}
+                        <tr>
+                            <td>{{.Username}}</td>
+                            <td>{{.DisplayName}}</td>
+                            <td>
+                                {{if .IsIRoute}}
+                                <span class="badge bg-info">IRoute账号</span>
+                                {{else}}
+                                <span class="badge bg-secondary">普通账号</span>
+                                {{end}}
+                            </td>
+                            <td>
+                                {{if .Enabled}}
+                                <span class="badge bg-success status-badge">启用</span>
+                                {{else}}
+                                <span class="badge bg-danger status-badge">禁用</span>
+                                {{end}}
+                            </td>
 
-  <div class="row mt-4">
-    <div class="col-md-12">
-      <div class="card">
-        <div class="card-header">
-          <h3>模板列表</h3>
-          <div class="d-flex justify-content-between">
-            <a href="/template/add" class="btn btn-primary btn-sm">添加模板</a>
-            <a href="/templates" class="btn btn-outline-secondary btn-sm">查看全部</a>
-          </div>
+                        </tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                    <!-- 在账号列表表格后添加分页控件 -->
+                    <div class="d-flex justify-content-between mt-3">
+                        <div>
+                            显示 {{.currentPage}} 页，共 {{.totalAccounts}} 条记录
+                        </div>
+                        <nav>
+                            <ul class="pagination">
+                                {{if gt .currentPage 1}}
+                                <li class="page-item">
+                                    <a class="page-link" href="/?page={{sub .currentPage 1}}&page_size={{.pageSize}}" data-page="{{sub .currentPage 1}}">&laquo;</a>
+                                </li>
+                                {{end}}
+
+                                {{$totalPages := ceil (div .totalAccounts .pageSize)}}
+                                {{$start := max 1 (sub .currentPage 2)}}
+                                {{$end := min $totalPages (add .currentPage 2)}}
+
+                                {{range $i := seq $start $end}}
+                                <li class="page-item {{if eq $i $.currentPage}}active{{end}}">
+                                    <a class="page-link" href="/?page={{$i}}&page_size={{.pageSize}}" data-page="{{$i}}">{{$i}}</a>
+                                </li>
+                                {{end}}
+
+                                {{if lt .currentPage $totalPages}}
+                                <li class="page-item">
+                                    <a class="page-link" href="/?page={{add .currentPage 1}}&page_size={{.pageSize}}" data-page="{{add .currentPage 1}}">&raquo;</a>
+                                </li>
+                                {{end}}
+                            </ul>
+                        </nav>
+                    </div>
+
+                </div>
+            </div>
         </div>
-        <div class="card-body">
-          <table class="table table-striped">
-            <thead>
-            <tr>
-              <th>模板名称</th>
-              <th>模板类型</th>
-              <th>描述</th>
-              <th>包含IRoute路由数量</th>
-              <th>使用账号数量</th>
-              <th>操作</th>
-            </tr>
-            </thead>
-            <tbody>
-            {{range .templates}}
-            <tr>
-              <td>{{.Name}}</td>
-              <td>{{.Type}}</td>
-              <td>{{.Description}}</td>
-              <td>{{len .IRoutes}}</td>
-              <td>{{len .Accounts}}</td>
-              <td>
-                <a href="/template/edit/{{.ID}}" class="btn btn-sm btn-warning">编辑</a>
-                <button class="btn btn-sm btn-danger" onclick="deleteTemplate({{.ID}})">删除</button>
-              </td>
-            </tr>
-            {{end}}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
-  </div>
+
+
+    <div class="row mt-4">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h3>模板列表</h3>
+                    <div class="d-flex justify-content-between">
+                        <a href="/template/add" class="btn btn-primary btn-sm">添加模板</a>
+                        <a href="/templates" class="btn btn-outline-secondary btn-sm">查看全部</a>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <table class="table table-striped">
+                        <thead>
+                        <tr>
+                            <th>模板名称</th>
+                            <th>描述</th>
+                            <!--              <th>包含IRoute路由数量</th>-->
+                            <!--              <th>使用账号数量</th>-->
+                            <!--              <th>操作</th>-->
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {{range .templates}}
+                        <tr>
+                            <td>{{.Name}}</td>
+                            <td>{{.Description}}</td>
+                        </tr>
+                        {{end}}
+                        </tbody>
+                    </table>
+                    <!-- 在账号列表表格后添加分页控件 -->
+                    <div class="d-flex justify-content-between mt-3">
+                        <div>
+                            显示 {{.currentPage}} 页，共 {{.totalTemplates}} 条记录
+                        </div>
+                        <nav>
+                            <ul class="pagination">
+                                {{if gt .currentPage 1}}
+                                <li class="page-item">
+                                    <a class="page-link" href="/?page={{sub .currentPage 1}}&page_size={{.pageSize}}" data-page="{{sub .currentPage 1}}">&laquo;</a>
+                                </li>
+                                {{end}}
+
+                                {{$totalPages := ceil (div .totalTemplates .pageSize)}}
+                                {{$start := max 1 (sub .currentPage 2)}}
+                                {{$end := min $totalPages (add .currentPage 2)}}
+
+                                {{range $i := seq $start $end}}
+                                <li class="page-item {{if eq $i $.currentPage}}active{{end}}">
+                                    <a class="page-link" href="/?page={{$i}}&page_size={{.pageSize}}" data-page="{{$i}}">{{$i}}</a>
+                                </li>
+                                {{end}}
+
+                                {{if lt .currentPage $totalPages}}
+                                <li class="page-item">
+                                    <a class="page-link" href="/?page={{add .currentPage 1}}&page_size={{.pageSize}}" data-page="{{add .currentPage 1}}">&raquo;</a>
+                                </li>
+                                {{end}}
+                            </ul>
+                        </nav>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 
-<script>
-  function deleteAccount(username) {
-    if (confirm("确定要删除这个账号吗？")) {
-      fetch(`/api/accounts/${username}`, {
-        method: 'DELETE'
-      })
-              .then(response => response.json())
-              .then(data => {
-                if (data.message) {
-                  alert(data.message);
-                  location.reload();
-                } else {
-                  alert(data.error || "删除失败");
-                }
-              })
-              .catch(error => {
-                alert("删除失败: " + error.message);
-              });
-    }
-  }
 
-  function deleteTemplate(id) {
-    if (confirm("确定要删除这个模板吗？")) {
-      fetch(`/api/templates/${id}`, {
-        method: 'DELETE'
-      })
-              .then(response => response.json())
-              .then(data => {
-                if (data.message) {
-                  alert(data.message);
-                  location.reload();
-                } else {
-                  alert(data.error || "删除失败");
-                }
-              })
-              .catch(error => {
-                alert("删除失败: " + error.message);
-              });
-    }
-  }
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        document.querySelectorAll('.pagination a').forEach(link => {
+            link.addEventListener('click', function(e) {
+                e.preventDefault();
+                window.location.href = this.getAttribute('href');
+            });
+        });
+    });
 </script>
 </body>
 </html>

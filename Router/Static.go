@@ -6,6 +6,7 @@ import (
 	"gorm.io/gorm"
 	"net/http"
 	"openvpn-ccd/model"
+	"strconv"
 )
 
 func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB) {
@@ -15,21 +16,39 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 		web.GET("/", func(c *gin.Context) {
 			user, _ := c.Get("username")
 
-			accounts, err := ccdManager.GetAllAccounts()
+			// 获取分页参数，默认为第1页，每页10条
+			page := c.DefaultQuery("page", "1")
+			pageSize := c.DefaultQuery("page_size", "10")
+			pageInt, _ := strconv.Atoi(page)
+			pageSizeInt, _ := strconv.Atoi(pageSize)
+			offset := (pageInt - 1) * pageSizeInt
+
+			// 获取账号总数
+			totalAccounts, _ := ccdManager.GetAllAccountCount()
+			// 分页查询账号
+			accounts, err := ccdManager.GetAccountsWithPagination(offset, pageSizeInt)
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
 			}
 
-			//templates, err := ccdManager.GetAllTemplates()
-			//if err != nil {
-			//	c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
-			//	return
-			//}
+			// 获取模板总数
+			totalTemplates, _ := ccdManager.GetAllTemplatesCount()
+			// 分页查询模板
+			templates, err := ccdManager.GetTemplatesWithPagination(offset, pageSizeInt)
+			if err != nil {
+				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+				return
+			}
 
 			c.HTML(http.StatusOK, "index.html", gin.H{
-				"user":     user,
-				"accounts": accounts,
+				"user":           user,
+				"accounts":       accounts,
+				"templates":      templates,
+				"currentPage":    pageInt,
+				"pageSize":       pageSizeInt,
+				"totalAccounts":  totalAccounts,
+				"totalTemplates": totalTemplates,
 			})
 		})
 

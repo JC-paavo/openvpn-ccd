@@ -248,6 +248,63 @@ func (m *CCDManager) DeleteAccount(username string, user string) error {
 	}
 
 	// 删除账号
+	if account.IsIRoute {
+		// 1. 获取关联该IRoute账号的所有普通账号
+		var normalAccounts []Account
+		if err := m.db.Joins("JOIN account_routes ON account_routes.account_id = accounts.id").
+			Joins("JOIN routes ON account_routes.route_id = routes.id").
+			Joins("JOIN account_routes AS iroute_ar ON iroute_ar.route_id = routes.id").
+			Where("accounts.is_iroute =? AND iroute_ar.account_id =?", false, account.ID).
+			Preload("Templates").
+			Preload("Routes").
+			Find(&normalAccounts).Error; err != nil {
+			return fmt.Errorf("查询关联普通账号失败: %v", err)
+		}
+		if len(normalAccounts) > 0 {
+			if err := m.db.Model(&normalAccounts).Association("Templates").Clear(); err != nil {
+			}
+		}
+
+		//TODO: 获取关联该IRoute账号的所有模板
+		var templates []Template
+		if err := m.db.Joins("JOIN template_routes ON template_routes.template_id = templates.id").
+			Joins("JOIN routes ON template_routes.route_id = routes.id").
+			Joins("JOIN account_routes ON account_routes.route_id = routes.id").
+			Where("account_routes.account_id =?", account.ID).
+			Preload("Accounts").
+			Find(&templates).Error; err != nil {
+			return fmt.Errorf("查询关联模板失败: %v", err)
+		}
+		if len(templates) > 0 {
+			return fmt.Errorf("删除账号失败: 该账号被模板关联，无法删除")
+		}
+
+	}
+	//检查普通账号iroute关联
+	accounts, err := m.GetAccountIRouteAccounts(username)
+	if err != nil {
+		return fmt.Errorf("查询普通账号关联IRoute账号失败: %v", err)
+	}
+	templates, err := m.GetAccountTemplates(username)
+	if err != nil {
+		return fmt.Errorf("查询普通账号关联模板失败: %v", err)
+	}
+	if len(accounts) > 0 || len(templates) > 0 {
+		return fmt.Errorf("删除账号失败: 该账号有数据关联，无法删除")
+	}
+	//删除引用关系
+	if err := m.db.Model(&account).Association("Routes").Clear(); err != nil {
+		return fmt.Errorf("清除模板Irouter useer路由关联失败: %v", err)
+	}
+
+	if err := m.db.Model(&account).Association("Templates").Clear(); err != nil {
+		return fmt.Errorf("清除模板Irouter useer路由关联失败: %v", err)
+	}
+
+	// 删除不再被引用的路由记录
+	if err := m.db.Exec("DELETE FROM routes WHERE id IN (SELECT r.id FROM routes r LEFT JOIN account_routes ar ON r.id = ar.route_id WHERE ar.route_id IS NULL)").Error; err != nil {
+		return fmt.Errorf("删除无用路由记录失败: %v", err)
+	}
 	if err := m.db.Delete(&account).Error; err != nil {
 		return fmt.Errorf("删除账号失败: %v", err)
 	}
@@ -331,6 +388,78 @@ func (m *CCDManager) GetAllIRoutesAccount() ([]Account, error) {
 		return nil, err
 	}
 	return Accounts, nil
+}
+
+// 获取普通账号关联的IRoute账号
+func (m *CCDManager) GetAccountIRouteAccounts(username string) (map[uint]string, error) {
+	var account Account
+	if err := m.db.Preload("Routes.Accounts", "is_iroute = ?", true).
+		Where("username = ? AND is_iroute = ?", username, false).
+		First(&account).Error; err != nil {
+		return nil, err
+	}
+
+	irouteAccounts := make(map[uint]string)
+	for _, route := range account.Routes {
+		for _, acc := range route.Accounts {
+			if acc.IsIRoute {
+				irouteAccounts[acc.ID] = acc.DisplayName
+			}
+		}
+	}
+
+	return irouteAccounts, nil
+}
+
+// 获取普通账号关联的模板
+func (m *CCDManager) GetAccountTemplates(username string) ([]Template, error) {
+	var account Account
+	if err := m.db.Preload("Templates").
+		Where("username = ? AND is_iroute = ?", username, false).
+		First(&account).Error; err != nil {
+		return nil, fmt.Errorf("查询账号失败: %v", err)
+	}
+
+	return account.Templates, nil
+}
+
+// 分页获取账号
+func (m *CCDManager) GetAccountsWithPagination(offset, limit int) ([]Account, error) {
+	var accounts []Account
+	if err := m.db.Preload("Routes.Accounts").Preload("Templates").
+		Offset(offset).Limit(limit).
+		Find(&accounts).Error; err != nil {
+		return nil, err
+	}
+	return accounts, nil
+}
+
+// 分页获取模板
+func (m *CCDManager) GetTemplatesWithPagination(offset, limit int) ([]Template, error) {
+	var templates []Template
+	if err := m.db.Preload("Accounts").Preload("Routes.Accounts").
+		Offset(offset).Limit(limit).
+		Find(&templates).Error; err != nil {
+		return nil, err
+	}
+	return templates, nil
+}
+
+func (m *CCDManager) GetAllTemplatesCount() (int64, error) {
+	var templatesTotal int64
+	if err := m.db.Model(&Template{}).Count(&templatesTotal).Error; err != nil {
+		return 0, err
+	}
+
+	return templatesTotal, nil
+}
+func (m *CCDManager) GetAllAccountCount() (int64, error) {
+	var accountsTotal int64
+	if err := m.db.Model(&Account{}).Count(&accountsTotal).Error; err != nil {
+		return 0, err
+	}
+
+	return accountsTotal, nil
 }
 
 // 生成CCD配置文件

@@ -191,4 +191,24 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		}
 		c.JSON(http.StatusOK, accounts)
 	})
+	// 获取账号关联的IRoute账号
+	api.GET("/accounts/:username/iroutes", func(c *gin.Context) {
+		username := c.Param("username")
+		iroutes, err := ccdManager.GetAccountIRouteAccounts(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, iroutes)
+	})
+	// 获取账号关联的模板
+	api.GET("/accounts/:username/templates", func(c *gin.Context) {
+		username := c.Param("username")
+		templates, err := ccdManager.GetAccountTemplates(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			return
+		}
+		c.JSON(http.StatusOK, templates)
+	})
 }
