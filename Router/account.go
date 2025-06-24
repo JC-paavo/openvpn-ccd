@@ -66,7 +66,6 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		username := user.(string)
 		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "账号创建/更新成功"})
@@ -86,7 +85,6 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		}
 		if err := c.ShouldBindJSON(&Account); err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{"json error": err.Error()})
-			return
 		}
 		var TemplateIDsUints []uint
 		var IrouteIDsrUnits []uint
@@ -130,8 +128,10 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		//fmt.Println(newAccount.Routes)
 		user, _ := c.Get("username")
 		username := user.(string)
+
 		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+			fmt.Printf("更新账号失败!%s", err.Error())
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新账号失败!"})
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "账号创建/更新成功"})

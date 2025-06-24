@@ -73,15 +73,6 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 		}
 	}
 
-	var iroutesRoutes []Route
-	if len(IrouteIDs) != 0 {
-		if err := m.db.Joins("JOIN account_routes ON account_routes.route_id = routes.id").
-			Where("account_routes.account_id IN ?", IrouteIDs).
-			Find(&iroutesRoutes).Error; err != nil {
-			return fmt.Errorf("CreateOrUpdateAccount:查询IRoute账号路由失败: %v", err)
-		}
-	}
-
 	result := m.db.Where("username = ?", newAccount.Username).First(&existing)
 
 	switch c.Request.Method {
@@ -100,7 +91,15 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 			}
 			m.logger.Printf("用户 %s 创建了iroute账号: %s", user, newAccount.Username)
 		} else {
-
+			//查询出普通账号关联的iroute账号路由
+			var iroutesRoutes []Route
+			if len(IrouteIDs) != 0 {
+				if err := m.db.Joins("JOIN account_routes ON account_routes.route_id = routes.id").
+					Where("account_routes.account_id IN ?", IrouteIDs).
+					Find(&iroutesRoutes).Error; err != nil {
+					return fmt.Errorf("CreateOrUpdateAccount:查询IRoute账号路由失败: %v", err)
+				}
+			}
 			newAccount.Templates = templates
 			//account.Routes = append(account.Routes, iroutesRoutes...)
 			if err := m.db.Create(&newAccount).Error; err != nil {
@@ -114,6 +113,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 		// 生成并写入CCD配置文件
 
 	case "PUT":
+		var iroutesRoutes []Route
 		if result.Error != nil {
 			if errors.Is(result.Error, gorm.ErrRecordNotFound) {
 				return fmt.Errorf("查询账号不存在，请创建新账号: %v", result.Error)
@@ -129,12 +129,17 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 		if newAccount.IsIRoute {
 			//先拿到和这个iroute user关联的account
 			var tmpaccount Account
-			m.db.Preload("Routes").Preload("Routes.Accounts").Where("id = ?", newAccount.ID).First(&tmpaccount)
-			// 先清空现有的关联
+
+			if err := m.db.Preload("Routes").Where("id = ?", newAccount.ID).First(&tmpaccount).Error; err != nil {
+				if err != gorm.ErrRecordNotFound {
+					return fmt.Errorf("查询irouter账号失败: %v", err)
+				}
+			}
 
 			// 1. 获取关联该IRoute账号的所有普通账号
 			var normalAccounts []Account
-			if err := m.db.Joins("JOIN account_routes ON account_routes.account_id = accounts.id").
+			if err := m.db.Distinct("accounts.*").
+				Joins("JOIN account_routes ON account_routes.account_id = accounts.id").
 				Joins("JOIN routes ON account_routes.route_id = routes.id").
 				Joins("JOIN account_routes AS iroute_ar ON iroute_ar.route_id = routes.id").
 				Where("accounts.is_iroute = ? AND iroute_ar.account_id = ?", false, newAccount.ID).
@@ -143,7 +148,6 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				Find(&normalAccounts).Error; err != nil {
 				return fmt.Errorf("查询关联普通账号失败: %v", err)
 			}
-
 			//TODO: 获取关联该IRoute账号的所有模板
 			var templates []Template
 			if err := m.db.Joins("JOIN template_routes ON template_routes.template_id = templates.id").
@@ -156,31 +160,54 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 			}
 
 			err := m.db.Transaction(func(tx *gorm.DB) error {
-				// 2. 清空所有关联的模板
+				// 2. 清空当前iroute账号的iroute路由
 				if err := m.db.Model(&newAccount).Association("Routes").Clear(); err != nil {
 					return fmt.Errorf("清除模板Irouter useer路由关联失败: %v", err)
 				}
+				oldrouteIDs := make([]uint, len(tmpaccount.Routes))
+				for i, route := range tmpaccount.Routes {
+					oldrouteIDs[i] = route.ID
+				}
+				// /清空所有普通账号关联的当前irouter账号的路由
+				if len(oldrouteIDs) > 0 {
+					if err := m.db.Exec("DELETE FROM account_routes WHERE route_id IN ? AND account_id IN (SELECT id FROM accounts WHERE is_iroute = false)", oldrouteIDs).Error; err != nil {
+						return fmt.Errorf("删除普通账号关联路由失败: %v", err)
+					}
+				}
+				//if len(normalAccounts) > 0 {
+				//	for _, account := range normalAccounts {
+				//		// 先获取当前账号的所有路由
+				//		//for _, route := range tmpaccount.Routes {
+				//		//	fmt.Printf("删除普通账号路由: %s", route.Route)
+				//		//	err := m.db.Model(&account).Association("Routes").Delete(route)
+				//		//	if err != nil {
+				//		//		fmt.Printf("删除普通账号路由失败: %v", err)
+				//		//	}
+				//		//}
+				//		if err := m.db.Model(&AccountRoute{}).Exec("delete from account_routes where account_id = ? and route_id in ?", account.ID, oldrouteIDs).Error; err != nil {
+				//			return fmt.Errorf("删除普通账号路由失败: %v", err)
+				//		}
+				//	}
+				//}
 
-				//清空所有普通账号关联的iroute路由
-				for _, account := range normalAccounts {
-					if err := m.db.Model(&account).Association("Routes").Clear(); err != nil {
-						return fmt.Errorf("清除普通账号 irouter路由关联失败: %v", err)
+				//删除所有模版关联的更新当前iroute路由
+				if len(templates) > 0 {
+					for _, template := range templates {
+						// 先获取当前账号的所有路由
+						for _, route := range tmpaccount.Routes {
+							fmt.Printf("删除模板路由: %s", route.Route)
+							err := m.db.Model(&template).Association("Routes").Delete(route)
+							if err != nil {
+								fmt.Printf("删除模板路由失败: %v", err)
+							}
+						}
 					}
 				}
 
-				//清空所有模版关联的iroute路由
-				for _, template := range templates {
-					if err := m.db.Model(&template).Association("Routes").Delete(tmpaccount.Routes); err != nil {
-						return fmt.Errorf("清除模板 irouter路由关联失败: %v", err)
-					}
-				}
 				//删除原来route表中iroter账号路由
 				if len(tmpaccount.Routes) > 0 {
-					routeIDs := make([]uint, len(tmpaccount.Routes))
-					for i, route := range tmpaccount.Routes {
-						routeIDs[i] = route.ID
-					}
-					if err := m.db.Unscoped().Where("id IN ?", routeIDs).Delete(&Route{}).Error; err != nil {
+					//fmt.Println(oldrouteIDs)
+					if err := m.db.Unscoped().Where("id IN ?", oldrouteIDs).Delete(&Route{}).Error; err != nil {
 						return fmt.Errorf("删除irouter账号原路由失败: %v", err)
 					}
 				}
@@ -191,29 +218,36 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				}
 
 				//创建新的irouter账号路由
-				if len(iroutesRoutes) > 0 {
+				if len(newRoutes) > 0 {
 					if err := m.db.Create(&newRoutes).Error; err != nil {
 						return fmt.Errorf("创建新的irouter路由失败: %v", err)
 					}
-					if err := m.db.Model(&newAccount).Association("Routes").Append(&newRoutes); err != nil {
+					if err := m.db.Model(&newAccount).Association("Routes").Append(newRoutes); err != nil {
 						return fmt.Errorf("更新账号关联路由失败: %v", err)
 					}
+					//更新iroute文件
+					err := m.generateCCDConfig(newAccount.Username)
+					if err != nil {
+						return fmt.Errorf("更新irouter账号配置失败: %v", err)
+					}
 				}
-
 				//更新普通账号关联的irouter路由
 				for _, account := range normalAccounts {
-					if err := m.db.Model(&account).Association("Routes").Append(&newRoutes); err != nil {
+					var newNoraccount Account
+					m.db.Where("id =?", account.ID).First(&newNoraccount)
+					if err := m.db.Model(&newNoraccount).Association("Routes").Append(newRoutes); err != nil {
 						return fmt.Errorf("更新普通账号关联路由失败: %v", err)
 					}
 				}
 
 				//更新模板关联的irouter路由
 				for _, template := range templates {
-					if err := m.db.Model(&template).Association("Routes").Append(newRoutes); err != nil {
+					var newTemplate Template
+					m.db.Where("id =?", template.ID).First(&newTemplate)
+					if err := m.db.Model(&newTemplate).Association("Routes").Append(newRoutes); err != nil {
 						return fmt.Errorf("更新模板关联路由失败: %v", err)
 					}
 				}
-
 				return nil
 			})
 
@@ -240,42 +274,54 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				}
 			}
 			return nil
-		}
-
-		//删除自定义路由
-		if err := m.db.Exec("DELETE FROM account_routes WHERE account_id = ? AND route_id NOT IN (SELECT route_id FROM template_routes) AND route_id NOT IN (SELECT route_id FROM account_routes WHERE account_id IN (SELECT id FROM accounts WHERE is_iroute = true))", existing.ID).Error; err != nil {
-			return fmt.Errorf("删除自定义路由失败: %v", err)
-		}
-		// 删除不再被引用的路由记录
-		if err := m.db.Exec("DELETE FROM routes WHERE id IN (SELECT r.id FROM routes r LEFT JOIN account_routes ar ON r.id = ar.route_id WHERE ar.route_id IS NULL)").Error; err != nil {
-			return fmt.Errorf("删除无用路由记录失败: %v", err)
-		}
-
-		// 先清空现有的关联
-		if err := m.db.Model(&newAccount).Association("Routes").Clear(); err != nil {
-			return fmt.Errorf("清除账号路由关联失败: %v", err)
-		}
-
-		if err := m.db.Model(&newAccount).Association("Templates").Clear(); err != nil {
-			return fmt.Errorf("清除模板Iroutel路由关联失败: %v", err)
-		}
-
-		if err := m.db.Save(&newAccount).Error; err != nil {
-			return fmt.Errorf("更新账号失败: %v", err)
-		}
-
-		if len(newRoutes) > 0 {
-
-			if err := m.db.Create(&newRoutes).Error; err != nil {
-				return fmt.Errorf("创建新的路由失败: %v", err)
+		} else {
+			//查询出普通账号更新时关联的iroute账号的路由
+			if len(IrouteIDs) != 0 {
+				if err := m.db.Joins("JOIN account_routes ON account_routes.route_id = routes.id").
+					Where("account_routes.account_id IN ?", IrouteIDs).
+					Find(&iroutesRoutes).Error; err != nil {
+					return fmt.Errorf("CreateOrUpdateAccount:查询IRoute账号路由失败: %v", err)
+				}
 			}
-			if err := m.db.Model(&newAccount).Association("Routes").Append(&newRoutes); err != nil {
+		}
+		fmt.Println("更新操作...")
+		return m.db.Transaction(func(tx *gorm.DB) error {
+			//删除自定义路由
+			if err := m.db.Exec("DELETE FROM account_routes WHERE account_id = ? AND route_id NOT IN (SELECT route_id FROM template_routes) AND route_id NOT IN (SELECT route_id FROM account_routes WHERE account_id IN (SELECT id FROM accounts WHERE is_iroute = true))", existing.ID).Error; err != nil {
+				return fmt.Errorf("删除自定义路由失败: %v", err)
+			}
+			// 删除不再被引用的路由记录
+			if err := m.db.Exec("DELETE FROM routes WHERE id IN (SELECT r.id FROM routes r LEFT JOIN account_routes ar ON r.id = ar.route_id WHERE ar.route_id IS NULL)").Error; err != nil {
+				return fmt.Errorf("删除无用路由记录失败: %v", err)
+			}
+
+			// 先清空现有的关联
+			if err := m.db.Model(&newAccount).Association("Routes").Clear(); err != nil {
+				return fmt.Errorf("清除账号路由关联失败: %v", err)
+			}
+
+			if err := m.db.Model(&newAccount).Association("Templates").Clear(); err != nil {
+				return fmt.Errorf("清除模板Iroutel路由关联失败: %v", err)
+			}
+
+			if err := m.db.Save(&newAccount).Error; err != nil {
 				return fmt.Errorf("更新账号失败: %v", err)
 			}
-		}
-		//更新关联
-		m.db.Model(&newAccount).Association("Routes").Append(iroutesRoutes)
-		m.db.Model(&newAccount).Association("Templates").Append(templates)
+
+			if len(newRoutes) > 0 {
+
+				if err := m.db.Create(&newRoutes).Error; err != nil {
+					return fmt.Errorf("创建新的路由失败: %v", err)
+				}
+				if err := m.db.Model(&newAccount).Association("Routes").Append(&newRoutes); err != nil {
+					return fmt.Errorf("更新账号失败: %v", err)
+				}
+			}
+			//更新关联
+			m.db.Model(&newAccount).Association("Routes").Append(iroutesRoutes)
+			m.db.Model(&newAccount).Association("Templates").Append(templates)
+			return nil
+		})
 	}
 	m.generateCCDConfig(newAccount.Username)
 	return nil
@@ -610,7 +656,7 @@ func (m *CCDManager) generateCCDConfig(username string) error {
 	defer file.Close()
 	// IRoute账号配置
 	if tmpAccount.IsIRoute {
-		file.WriteString(fmt.Sprintf("#Iroute账号:%s", tmpAccount.DisplayName))
+		file.WriteString(fmt.Sprintf("#Iroute账号:%s\n", tmpAccount.DisplayName))
 		for _, route := range tmpAccount.Routes {
 			if _, err := file.WriteString(fmt.Sprintf("iroute %s\n", route.Route)); err != nil {
 				return fmt.Errorf("写入配置文件失败: %v", err)
@@ -653,6 +699,7 @@ func (m *CCDManager) getConfigPath(username string) string {
 
 // 批量写push route
 func writeRoute(routes []Route, file *os.File) error {
+	file.WriteString(fmt.Sprintf("#自定义路由和irouter关联路由:\n"))
 	for _, route := range routes {
 		if _, err := file.WriteString(fmt.Sprintf("push \"route %s\"\n", route.Route)); err != nil {
 			return fmt.Errorf("写入配置文件失败: %v", err)
@@ -663,6 +710,9 @@ func writeRoute(routes []Route, file *os.File) error {
 func writeTemplateRoute(tpls []Template, file *os.File) error {
 	for _, tpl := range tpls {
 		for _, route := range tpl.Routes {
+			if _, err := file.WriteString(fmt.Sprintf("#模板类型路由 模版名称:%s\n", tpl.Name)); err != nil {
+				return fmt.Errorf("写入配置文件失败: %v", err)
+			}
 			if _, err := file.WriteString(fmt.Sprintf("push \"route %s\"\n", route.Route)); err != nil {
 				return fmt.Errorf("写入配置文件失败: %v", err)
 			}
