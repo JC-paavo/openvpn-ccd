@@ -286,16 +286,29 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 		// 日志页面
 		web.GET("/logs", func(c *gin.Context) {
 			user, _ := c.Get("username")
-
-			var logs []model.Log
-			if err := db.Order("created_at DESC").Limit(100).Find(&logs).Error; err != nil {
+			// 获取分页参数，默认为第1页，每页10条
+			page := c.DefaultQuery("page", "1")
+			pageSize := c.DefaultQuery("page_size", "10")
+			pageInt, _ := strconv.Atoi(page)
+			pageSizeInt, _ := strconv.Atoi(pageSize)
+			offset := (pageInt - 1) * pageSizeInt
+			var totalLogscounts int64
+			if err := db.Model(&model.Log{}).Count(&totalLogscounts).Error; err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
 			}
 
+			var logs []model.Log
+			if err := db.Order("created_at DESC").Offset(offset).Limit(pageSizeInt).Find(&logs).Error; err != nil {
+				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+				return
+			}
 			c.HTML(http.StatusOK, "logs.html", gin.H{
-				"user": user,
-				"logs": logs,
+				"user":            user,
+				"logs":            logs,
+				"currentPage":     pageInt,
+				"pageSize":        pageSizeInt,
+				"totalLogscounts": int(totalLogscounts),
 			})
 		})
 	}

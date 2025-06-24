@@ -142,7 +142,7 @@
           <ul class="pagination">
             {{if gt .currentPage 1}}
             <li class="page-item">
-              <a class="page-link" href="/?page={{sub .currentPage 1}}&page_size={{.pageSize}}" data-page="{{sub .currentPage 1}}">&laquo;</a>
+              <a class="page-link" href="/accounts?page={{sub .currentPage 1}}&page_size={{.pageSize}}" data-page="{{sub .currentPage 1}}">&laquo;</a>
             </li>
             {{end}}
 
@@ -152,13 +152,13 @@
 
             {{range $i := seq $start $end}}
             <li class="page-item {{if eq $i $.currentPage}}active{{end}}">
-              <a class="page-link" href="/?page={{$i}}&page_size={{.pageSize}}" data-page="{{$i}}">{{$i}}</a>
+              <a class="page-link" href="/accounts?page={{$i}}&page_size={{$.pageSize}}" data-page="{{$i}}">{{$i}}</a>
             </li>
             {{end}}
 
             {{if lt .currentPage $totalPages}}
             <li class="page-item">
-              <a class="page-link" href="/?page={{add .currentPage 1}}&page_size={{.pageSize}}" data-page="{{add .currentPage 1}}">&raquo;</a>
+              <a class="page-link" href="/accounts?page={{add .currentPage 1}}&page_size={{.pageSize}}" data-page="{{add .currentPage 1}}">&raquo;</a>
             </li>
             {{end}}
           </ul>

@@ -213,7 +213,7 @@
 
                                 {{range $i := seq $start $end}}
                                 <li class="page-item {{if eq $i $.currentPage}}active{{end}}">
-                                    <a class="page-link" href="/?page={{$i}}&page_size={{.pageSize}}" data-page="{{$i}}">{{$i}}</a>
+                                    <a class="page-link" href="/?page={{$i}}&page_size={{$.pageSize}}" data-page="{{$i}}">{{$i}}</a>
                                 </li>
                                 {{end}}
 
@@ -281,7 +281,7 @@
 
                                 {{range $i := seq $start $end}}
                                 <li class="page-item {{if eq $i $.currentPage}}active{{end}}">
-                                    <a class="page-link" href="/?page={{$i}}&page_size={{.pageSize}}" data-page="{{$i}}">{{$i}}</a>
+                                    <a class="page-link" href="/?page={{$i}}&page_size={{$.pageSize}}" data-page="{{$i}}">{{$i}}</a>
                                 </li>
                                 {{end}}
 
