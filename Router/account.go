@@ -64,7 +64,7 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		}
 		user, _ := c.Get("username")
 		username := user.(string)
-		if err := ccdManager.CreateOrUpdateAccount(&newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
+		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 			return
 		}
@@ -85,7 +85,7 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 			IrouteIDs   []string `json:"iroute_ids"`
 		}
 		if err := c.ShouldBindJSON(&Account); err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			c.JSON(http.StatusBadRequest, gin.H{"json error": err.Error()})
 			return
 		}
 		var TemplateIDsUints []uint
@@ -116,9 +116,9 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 			Phone:       Account.Phone,
 			IsIRoute:    Account.IsIRoute,
 			Enabled:     Account.Enabled,
-			Routes:      make([]model.Route, len(Account.Routes)),
 			// 需要将routes转换为模型中的Route结构
 		}
+		newAccount.Routes = make([]model.Route, len(Account.Routes))
 		if len(Account.Routes) > 0 {
 			for i, route := range Account.Routes {
 				newAccount.Routes[i] = model.Route{Route: route}
@@ -130,9 +130,8 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 		//fmt.Println(newAccount.Routes)
 		user, _ := c.Get("username")
 		username := user.(string)
-		if err := ccdManager.CreateOrUpdateAccount(&newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
+		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
-			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "账号创建/更新成功"})

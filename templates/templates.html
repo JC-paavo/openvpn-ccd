@@ -71,6 +71,36 @@
                 {{end}}
                 </tbody>
             </table>
+            <div class="d-flex justify-content-between mt-3">
+                <div>
+                    显示 {{.currentPage}} 页，共 {{.totalTemplates}} 条记录
+                </div>
+                <nav>
+                    <ul class="pagination">
+                        {{if gt .currentPage 1}}
+                        <li class="page-item">
+                            <a class="page-link" href="/?page={{sub .currentPage 1}}&page_size={{.pageSize}}" data-page="{{sub .currentPage 1}}">&laquo;</a>
+                        </li>
+                        {{end}}
+
+                        {{$totalPages := ceil (div .totalTemplates .pageSize)}}
+                        {{$start := max 1 (sub .currentPage 2)}}
+                        {{$end := min $totalPages (add .currentPage 2)}}
+
+                        {{range $i := seq $start $end}}
+                        <li class="page-item {{if eq $i $.currentPage}}active{{end}}">
+                            <a class="page-link" href="/?page={{$i}}&page_size={{.pageSize}}" data-page="{{$i}}">{{$i}}</a>
+                        </li>
+                        {{end}}
+
+                        {{if lt .currentPage $totalPages}}
+                        <li class="page-item">
+                            <a class="page-link" href="/?page={{add .currentPage 1}}&page_size={{.pageSize}}" data-page="{{add .currentPage 1}}">&raquo;</a>
+                        </li>
+                        {{end}}
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 </div>

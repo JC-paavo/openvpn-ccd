@@ -51,11 +51,20 @@ func InitRoute(r *gin.Engine, ccdManager *model.CCDManager, db *gorm.DB, logger 
 		"add": add,
 	})
 	r.SetFuncMap(template.FuncMap{
-		"add":  func(a, b int) int { return a + b },
-		"sub":  func(a, b int) int { return a - b },
-		"mul":  func(a, b int) int { return a * b },
-		"div":  func(a, b int) int { return a / b },
-		"ceil": func(a float64) int { return int(math.Ceil(a)) },
+		"add": func(a, b int) int { return a + b },
+		"sub": func(a, b int) int { return a - b },
+		"mul": func(a, b int) int { return a * b },
+		"div": func(a, b int) int { return a / b },
+		"ceil": func(a interface{}) int {
+			switch v := a.(type) {
+			case int:
+				return v
+			case float64:
+				return int(math.Ceil(v))
+			default:
+				return 0
+			}
+		},
 		"seq": func(start, end int) []int {
 			var seq []int
 			for i := start; i <= end; i++ {

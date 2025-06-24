@@ -1,3 +1,8 @@
+// 1.账号分为irouter账号和普通用户账号
+// 2.iroute账号可以添加iroute注册路由，普通账号可以添加push route路由,路由和账号关联通过account_routes表关联
+// 3.普通账号和iroute账号可以关联，通过account_routes表关联，路由里面区分账号类型主要通过Routes.Accounts字段里面的is_iroute字段区分
+// 4.模版关联iroute账号路由通过template_routes
+// 5.普通账号关联模版通过account_templates
 package model
 
 import "gorm.io/gorm"

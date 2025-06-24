@@ -337,24 +337,24 @@
                 }
                 routes.push(route);
             });
-            // if (routes.length === 0) {
-            //     showError('irouteRouteError', '至少需要添加一个路由');
-            //     isValid = false;
-            // }
+            if (routes.length === 0) {
+                showError('irouteRouteError', '至少需要添加一个路由');
+                isValid = false;
+            }
         } else {
             const inputs = $('.normalRouteInput');
             inputs.each(function () {
                 const route = $(this).val().trim();
+                if (route == '') {
+                    showError('normalRouteError', '路由信息不能为空');
+                    isValid = false;
+                }
                 if (route && !validateRoute(route)) {
                     showError('normalRouteError', '路由格式不正确，应为 "IP地址 子网掩码"');
                     isValid = false;
                 }
                 routes.push(route);
             });
-            if (routes.length === 0) {
-                showError('normalRouteError', '至少需要添加一个路由');
-                isValid = false;
-            }
         }
 
         if (!isValid) return;

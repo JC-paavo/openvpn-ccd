@@ -47,8 +47,8 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 				"templates":      templates,
 				"currentPage":    pageInt,
 				"pageSize":       pageSizeInt,
-				"totalAccounts":  totalAccounts,
-				"totalTemplates": totalTemplates,
+				"totalAccounts":  int(totalAccounts),
+				"totalTemplates": int(totalTemplates),
 			})
 		})
 
@@ -98,7 +98,7 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 				Find(&customRoutes).Error; err != nil {
 				// 处理错误
 			}
-			fmt.Println(customRoutes)
+			//fmt.Println(customRoutes)
 			//提取template select
 			allTemplates, err := ccdManager.GetAllTemplates()
 			selectedTemplateIDs := make(map[uint]bool)
@@ -149,8 +149,17 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 		web.GET("/templates", func(c *gin.Context) {
 			user, _ := c.Get("username")
 
-			templates, err := ccdManager.GetAllTemplates()
-
+			//templates, err := ccdManager.GetAllTemplates()
+			// 获取分页参数，默认为第1页，每页10条
+			page := c.DefaultQuery("page", "1")
+			pageSize := c.DefaultQuery("page_size", "10")
+			pageInt, _ := strconv.Atoi(page)
+			pageSizeInt, _ := strconv.Atoi(pageSize)
+			offset := (pageInt - 1) * pageSizeInt
+			// 获取模板总数
+			totalTemplates, _ := ccdManager.GetAllTemplatesCount()
+			// 分页查询模板
+			templates, err := ccdManager.GetTemplatesWithPagination(offset, pageSizeInt)
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
@@ -170,8 +179,11 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 			}
 
 			c.HTML(http.StatusOK, "templates.html", gin.H{
-				"user":      user,
-				"templates": templates,
+				"user":           user,
+				"templates":      templates,
+				"currentPage":    pageInt,
+				"pageSize":       pageSizeInt,
+				"totalTemplates": int(totalTemplates),
 			})
 		})
 
@@ -236,16 +248,33 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 		})
 		web.GET("/accounts", func(c *gin.Context) {
 			user, _ := c.Get("username")
+			// 获取分页参数，默认为第1页，每页10条
+			page := c.DefaultQuery("page", "1")
+			pageSize := c.DefaultQuery("page_size", "10")
+			pageInt, _ := strconv.Atoi(page)
+			pageSizeInt, _ := strconv.Atoi(pageSize)
+			offset := (pageInt - 1) * pageSizeInt
 
-			accounts, err := ccdManager.GetAllAccounts()
+			// 获取账号总数
+			totalAccounts, _ := ccdManager.GetAllAccountCount()
+			// 分页查询账号
+			accounts, err := ccdManager.GetAccountsWithPagination(offset, pageSizeInt)
+			if err != nil {
+				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
+				return
+			}
+			//accounts, err := ccdManager.GetAllAccounts()
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
 			}
 
 			c.HTML(http.StatusOK, "accounts.html", gin.H{
-				"user":     user,
-				"accounts": accounts,
+				"user":          user,
+				"accounts":      accounts,
+				"currentPage":   pageInt,
+				"pageSize":      pageSizeInt,
+				"totalAccounts": int(totalAccounts),
 			})
 		})
 
