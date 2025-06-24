@@ -39,6 +39,13 @@
 
     <div class="d-flex justify-content-between mb-4">
         <h3>模板列表</h3>
+        <div>
+            <form class="d-flex" method="get" action="/templates">
+                <input class="form-control me-2" type="search" name="search" placeholder="搜索模板名称..."
+                       value="{{.searchQuery}}" aria-label="Search">
+                <button class="btn btn-outline-success" type="submit">搜索</button>
+            </form>
+        </div>
         <a href="/template/add" class="btn btn-primary">添加模板</a>
     </div>
 
