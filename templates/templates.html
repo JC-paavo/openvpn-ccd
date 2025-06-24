@@ -4,6 +4,7 @@
     <meta charset="UTF-8">
     <title>模板管理</title>
     <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -39,11 +40,20 @@
 
     <div class="d-flex justify-content-between mb-4">
         <h3>模板列表</h3>
-        <div>
+        <div class="d-flex">
             <form class="d-flex" method="get" action="/templates">
-                <input class="form-control me-2" type="search" name="search" placeholder="搜索模板名称..."
-                       value="{{.searchQuery}}" aria-label="Search">
-                <button class="btn btn-outline-success" type="submit">搜索</button>
+                <div class="input-group">
+                    <input class="form-control border-primary rounded-start"
+                           type="search"
+                           name="search"
+                           placeholder="输入模板名称..."
+                           value="{{.searchQuery}}"
+                           aria-label="Search"
+                           style="min-width: 250px;">
+                    <button class="btn btn-primary" type="submit">
+                        <i class="bi bi-search"></i> 搜索
+                    </button>
+                </div>
             </form>
         </div>
         <a href="/template/add" class="btn btn-primary">添加模板</a>

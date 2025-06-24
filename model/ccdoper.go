@@ -470,14 +470,25 @@ func (m *CCDManager) GetAccountTemplates(username string) ([]Template, error) {
 }
 
 // 分页获取账号
-func (m *CCDManager) GetAccountsWithPagination(offset, limit int) ([]Account, error) {
+func (m *CCDManager) GetAccountsWithPagination(offset, limit int, search string) ([]Account, error) {
 	var accounts []Account
-	if err := m.db.Preload("Routes.Accounts").
-		Preload("Templates").
-		Offset(offset).
-		Limit(limit).
-		Find(&accounts).Error; err != nil {
-		return nil, err
+	if search != "" {
+		if err := m.db.Preload("Routes.Accounts").
+			Preload("Templates").
+			Where("username LIKE? or display_name LIKE ?", "%"+search+"%", "%"+search+"%").
+			Offset(offset).
+			Limit(limit).
+			Find(&accounts).Error; err != nil {
+			return nil, err
+		}
+	} else {
+		if err := m.db.Preload("Routes.Accounts").
+			Preload("Templates").
+			Offset(offset).
+			Limit(limit).
+			Find(&accounts).Error; err != nil {
+			return nil, err
+		}
 	}
 	// 为每个账号添加关联信息
 	for i := range accounts {
@@ -526,8 +537,17 @@ func (m *CCDManager) GetAccountsWithPagination(offset, limit int) ([]Account, er
 }
 
 // 分页获取模板
-func (m *CCDManager) GetTemplatesWithPagination(offset, limit int) ([]Template, error) {
+func (m *CCDManager) GetTemplatesWithPagination(offset, limit int, search string) ([]Template, error) {
 	var templates []Template
+	if search != "" {
+		if err := m.db.Preload("Accounts").Preload("Routes.Accounts").Where("name LIKE?", "%"+search+"%").
+			Offset(offset).Limit(limit).
+			Find(&templates).Error; err != nil {
+			return nil, err
+		}
+		return templates, nil
+	}
+
 	if err := m.db.Preload("Accounts").Preload("Routes.Accounts").
 		Offset(offset).Limit(limit).
 		Find(&templates).Error; err != nil {
@@ -536,16 +556,32 @@ func (m *CCDManager) GetTemplatesWithPagination(offset, limit int) ([]Template, 
 	return templates, nil
 }
 
-func (m *CCDManager) GetAllTemplatesCount() (int64, error) {
+func (m *CCDManager) GetAllTemplatesCount(search string) (int64, error) {
 	var templatesTotal int64
+
+	if search != "" {
+		if err := m.db.Model(&Template{}).Where("name LIKE ?", "%"+search+"%").Count(&templatesTotal).Error; err != nil {
+			return 0, err
+		}
+		return templatesTotal, nil
+	}
+
 	if err := m.db.Model(&Template{}).Count(&templatesTotal).Error; err != nil {
 		return 0, err
 	}
 
 	return templatesTotal, nil
 }
-func (m *CCDManager) GetAllAccountCount() (int64, error) {
+func (m *CCDManager) GetAllAccountCount(search string) (int64, error) {
+
 	var accountsTotal int64
+	if search != "" {
+		if err := m.db.Model(&Account{}).Where("username LIKE? or display_name LIKE ?", "%"+search+"%", "%"+search+"%").Count(&accountsTotal).Error; err != nil {
+			return 0, err
+		}
+		return accountsTotal, nil
+	}
+
 	if err := m.db.Model(&Account{}).Count(&accountsTotal).Error; err != nil {
 		return 0, err
 	}

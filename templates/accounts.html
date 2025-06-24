@@ -4,6 +4,7 @@
   <meta charset="UTF-8">
   <title>账号管理</title>
   <link href="/static/css/bootstrap.min.css" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.8.0/font/bootstrap-icons.css">
 </head>
 <body>
 <nav class="navbar navbar-expand-lg navbar-light bg-light">
@@ -39,6 +40,22 @@
 
   <div class="d-flex justify-content-between mb-4">
     <h3>账号列表</h3>
+    <div class="d-flex">
+      <form class="d-flex" method="get" action="/accounts">
+        <div class="input-group">
+          <input class="form-control border-primary rounded-start"
+                 type="search"
+                 name="search"
+                 placeholder="输入账号名称..."
+                 value="{{.searchQuery}}"
+                 aria-label="Search"
+                 style="min-width: 250px;">
+          <button class="btn btn-primary" type="submit">
+            <i class="bi bi-search"></i> 搜索
+          </button>
+        </div>
+      </form>
+    </div>
     <a href="/account/add" class="btn btn-primary">添加账号</a>
   </div>
 
@@ -77,20 +94,34 @@
           </td>
           <td>
             {{if .IsIRoute}}
-            {{range $key,$value := .ReferencedTemplateNames}}
-            <span class="badge bg-primary">{{$value}}</span>
-            {{end}}
+              {{$count := 0}}
+              {{range $key,$value := .ReferencedTemplateNames}}
+                {{if lt $count 5}}
+                  <span class="badge bg-primary">{{$value}}</span>
+                  {{$count = add $count 1}}
+                {{end}}
+              {{end}}
+              {{if gt (len .ReferencedTemplateNames) 5}}
+                <span class="badge bg-secondary">+{{sub (len .ReferencedTemplateNames) 5}}</span>
+              {{end}}
             {{else}}
-            {{range .Templates}}
-            <span class="badge bg-primary">{{.Name}}</span>
-            {{end}}
+              {{range $key,$template := .Templates}}
+                <span class="badge bg-primary">{{$template.Name}}</span>
+              {{end}}
             {{end}}
 
           <td>
             {{if not .IsIRoute}}
-            {{range $key,$value := .IRouteAccounts}}
-            <span class="badge bg-primary">{{$value}}</span>
-            {{end}}
+              {{$count := 0}}
+              {{range $index, $value := .IRouteAccounts}}
+                {{if lt $count 5}}
+                  <span class="badge bg-primary">{{$value}}</span>
+                  {{$count = add $count 1}}
+                {{end}}
+              {{end}}
+              {{if gt (len .IRouteAccounts) 5}}
+                <span class="badge bg-secondary">+{{sub (len .IRouteAccounts) 5}}</span>
+              {{end}}
             {{else}}
             -
             {{end}}

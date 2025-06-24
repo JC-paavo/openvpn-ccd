@@ -23,19 +23,20 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 			pageSizeInt, _ := strconv.Atoi(pageSize)
 			offset := (pageInt - 1) * pageSizeInt
 
+			search := ""
 			// 获取账号总数
-			totalAccounts, _ := ccdManager.GetAllAccountCount()
+			totalAccounts, _ := ccdManager.GetAllAccountCount(search)
 			// 分页查询账号
-			accounts, err := ccdManager.GetAccountsWithPagination(offset, pageSizeInt)
+			accounts, err := ccdManager.GetAccountsWithPagination(offset, pageSizeInt, search)
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
 			}
 
 			// 获取模板总数
-			totalTemplates, _ := ccdManager.GetAllTemplatesCount()
+			totalTemplates, _ := ccdManager.GetAllTemplatesCount(search)
 			// 分页查询模板
-			templates, err := ccdManager.GetTemplatesWithPagination(offset, pageSizeInt)
+			templates, err := ccdManager.GetTemplatesWithPagination(offset, pageSizeInt, search)
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
@@ -148,7 +149,8 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 		// 模板列表页面
 		web.GET("/templates", func(c *gin.Context) {
 			user, _ := c.Get("username")
-
+			// 获取搜索参数
+			searchQuery := c.Query("search")
 			//templates, err := ccdManager.GetAllTemplates()
 			// 获取分页参数，默认为第1页，每页10条
 			page := c.DefaultQuery("page", "1")
@@ -157,9 +159,9 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 			pageSizeInt, _ := strconv.Atoi(pageSize)
 			offset := (pageInt - 1) * pageSizeInt
 			// 获取模板总数
-			totalTemplates, _ := ccdManager.GetAllTemplatesCount()
+			totalTemplates, _ := ccdManager.GetAllTemplatesCount(searchQuery)
 			// 分页查询模板
-			templates, err := ccdManager.GetTemplatesWithPagination(offset, pageSizeInt)
+			templates, err := ccdManager.GetTemplatesWithPagination(offset, pageSizeInt, searchQuery)
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
@@ -184,6 +186,7 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 				"currentPage":    pageInt,
 				"pageSize":       pageSizeInt,
 				"totalTemplates": int(totalTemplates),
+				"searchQuery":    searchQuery,
 			})
 		})
 
@@ -248,6 +251,7 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 		})
 		web.GET("/accounts", func(c *gin.Context) {
 			user, _ := c.Get("username")
+			searchQuery := c.Query("search")
 			// 获取分页参数，默认为第1页，每页10条
 			page := c.DefaultQuery("page", "1")
 			pageSize := c.DefaultQuery("page_size", "10")
@@ -256,9 +260,9 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 			offset := (pageInt - 1) * pageSizeInt
 
 			// 获取账号总数
-			totalAccounts, _ := ccdManager.GetAllAccountCount()
+			totalAccounts, _ := ccdManager.GetAllAccountCount(searchQuery)
 			// 分页查询账号
-			accounts, err := ccdManager.GetAccountsWithPagination(offset, pageSizeInt)
+			accounts, err := ccdManager.GetAccountsWithPagination(offset, pageSizeInt, searchQuery)
 			if err != nil {
 				c.HTML(http.StatusInternalServerError, "error.html", gin.H{"error": err.Error()})
 				return
@@ -275,6 +279,7 @@ func staticRoute(web *gin.RouterGroup, ccdManager *model.CCDManager, db *gorm.DB
 				"currentPage":   pageInt,
 				"pageSize":      pageSizeInt,
 				"totalAccounts": int(totalAccounts),
+				"searchQuery":   searchQuery,
 			})
 		})
 
