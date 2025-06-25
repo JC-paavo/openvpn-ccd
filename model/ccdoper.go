@@ -7,9 +7,11 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"log"
+	"openvpn-ccd/utils"
 	"os"
 	"path/filepath"
 	"regexp"
+	"strings"
 )
 
 // CCD配置管理器
@@ -86,6 +88,23 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 			return fmt.Errorf("账号已存在")
 		}
 		if newAccount.IsIRoute {
+			var irouteAccounts []Account
+			m.db.Preload("Routes").Where("is_iroute = ?", true).Find(&irouteAccounts)
+			//判断iroute路由是否冲突
+			if len(newRoutes) > 0 && len(irouteAccounts) > 0 {
+				for _, route := range newRoutes {
+					newip := strings.Split(route.Route, " ")
+					for _, ic := range irouteAccounts {
+						for _, irouteRoute := range ic.Routes {
+							exitIp := strings.Split(irouteRoute.Route, " ")
+							if res, err := utils.IsNetworkConflict(newip[0], newip[1], exitIp[0], exitIp[1]); err != nil || res {
+								return fmt.Errorf("CreateOrUpdateAccount:和%s路由冲突", ic.Username)
+							}
+						}
+
+					}
+				}
+			}
 			if err := m.db.Create(&newAccount).Error; err != nil {
 				return fmt.Errorf("CreateOrUpdateAccount:创建iroute账号失败: %v", err)
 			}
@@ -127,6 +146,23 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 			newAccount.Password = existing.Password // 保持原有密码
 		}
 		if newAccount.IsIRoute {
+			var irouteAccounts []Account
+			m.db.Preload("Routes").Where("is_iroute = ? and id != ?", true, newAccount.ID).Find(&irouteAccounts)
+			//判断iroute路由是否冲突
+			if len(newRoutes) > 0 && len(irouteAccounts) > 0 {
+				for _, route := range newRoutes {
+					newip := strings.Split(route.Route, " ")
+					for _, ic := range irouteAccounts {
+						for _, irouteRoute := range ic.Routes {
+							exitIp := strings.Split(irouteRoute.Route, " ")
+							if res, err := utils.IsNetworkConflict(newip[0], newip[1], exitIp[0], exitIp[1]); err != nil || res {
+								return fmt.Errorf("CreateOrUpdateAccount:和%s路由冲突", ic.Username)
+							}
+						}
+
+					}
+				}
+			}
 			//先拿到和这个iroute user关联的account
 			var tmpaccount Account
 
@@ -161,7 +197,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 
 			err := m.db.Transaction(func(tx *gorm.DB) error {
 				// 2. 清空当前iroute账号的iroute路由
-				if err := m.db.Model(&newAccount).Association("Routes").Clear(); err != nil {
+				if err := tx.Model(&newAccount).Association("Routes").Clear(); err != nil {
 					return fmt.Errorf("清除模板Irouter useer路由关联失败: %v", err)
 				}
 				oldrouteIDs := make([]uint, len(tmpaccount.Routes))
@@ -170,7 +206,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				}
 				// /清空所有普通账号关联的当前irouter账号的路由
 				if len(oldrouteIDs) > 0 {
-					if err := m.db.Exec("DELETE FROM account_routes WHERE route_id IN ? AND account_id IN (SELECT id FROM accounts WHERE is_iroute = false)", oldrouteIDs).Error; err != nil {
+					if err := tx.Exec("DELETE FROM account_routes WHERE route_id IN ? AND account_id IN (SELECT id FROM accounts WHERE is_iroute = false)", oldrouteIDs).Error; err != nil {
 						return fmt.Errorf("删除普通账号关联路由失败: %v", err)
 					}
 				}
@@ -196,7 +232,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 						// 先获取当前账号的所有路由
 						for _, route := range tmpaccount.Routes {
 							fmt.Printf("删除模板路由: %s", route.Route)
-							err := m.db.Model(&template).Association("Routes").Delete(route)
+							err := tx.Model(&template).Association("Routes").Delete(route)
 							if err != nil {
 								fmt.Printf("删除模板路由失败: %v", err)
 							}
@@ -207,22 +243,22 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				//删除原来route表中iroter账号路由
 				if len(tmpaccount.Routes) > 0 {
 					//fmt.Println(oldrouteIDs)
-					if err := m.db.Unscoped().Where("id IN ?", oldrouteIDs).Delete(&Route{}).Error; err != nil {
+					if err := tx.Unscoped().Where("id IN ?", oldrouteIDs).Delete(&Route{}).Error; err != nil {
 						return fmt.Errorf("删除irouter账号原路由失败: %v", err)
 					}
 				}
 
 				//更新账号
-				if err := m.db.Save(&newAccount).Error; err != nil {
+				if err := tx.Save(&newAccount).Error; err != nil {
 					return fmt.Errorf("更新账号失败: %v", err)
 				}
 
 				//创建新的irouter账号路由
 				if len(newRoutes) > 0 {
-					if err := m.db.Create(&newRoutes).Error; err != nil {
+					if err := tx.Create(&newRoutes).Error; err != nil {
 						return fmt.Errorf("创建新的irouter路由失败: %v", err)
 					}
-					if err := m.db.Model(&newAccount).Association("Routes").Append(newRoutes); err != nil {
+					if err := tx.Model(&newAccount).Association("Routes").Append(newRoutes); err != nil {
 						return fmt.Errorf("更新账号关联路由失败: %v", err)
 					}
 					//更新iroute文件
@@ -234,8 +270,8 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				//更新普通账号关联的irouter路由
 				for _, account := range normalAccounts {
 					var newNoraccount Account
-					m.db.Where("id =?", account.ID).First(&newNoraccount)
-					if err := m.db.Model(&newNoraccount).Association("Routes").Append(newRoutes); err != nil {
+					tx.Where("id =?", account.ID).First(&newNoraccount)
+					if err := tx.Model(&newNoraccount).Association("Routes").Append(newRoutes); err != nil {
 						return fmt.Errorf("更新普通账号关联路由失败: %v", err)
 					}
 				}
@@ -243,8 +279,8 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 				//更新模板关联的irouter路由
 				for _, template := range templates {
 					var newTemplate Template
-					m.db.Where("id =?", template.ID).First(&newTemplate)
-					if err := m.db.Model(&newTemplate).Association("Routes").Append(newRoutes); err != nil {
+					tx.Where("id =?", template.ID).First(&newTemplate)
+					if err := tx.Model(&newTemplate).Association("Routes").Append(newRoutes); err != nil {
 						return fmt.Errorf("更新模板关联路由失败: %v", err)
 					}
 				}
