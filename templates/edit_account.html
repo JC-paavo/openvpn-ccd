@@ -346,7 +346,7 @@
             .then(response => response.json())
             .then(data => {
                 if (data.error) {
-                    alert('保存失败: ' + data.error);
+                    alert('保存失败: ' + data.message);
                 } else {
                     alert('账号更新成功');
                     window.location.href = '/accounts';

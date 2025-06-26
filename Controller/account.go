@@ -138,7 +138,8 @@ func AccountUpdate(ccdManager *model.CCDManager) gin.HandlerFunc {
 
 		if err := ccdManager.CreateOrUpdateAccount(newAccount, username, c, IrouteIDsrUnits, TemplateIDsUints, newAccount.Routes); err != nil {
 			fmt.Printf("更新账号失败!%s", err.Error())
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新账号失败!"})
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "更新账号失败!", "message": err.Error()})
+			return
 		}
 
 		c.JSON(http.StatusOK, gin.H{"message": "账号创建/更新成功"})
