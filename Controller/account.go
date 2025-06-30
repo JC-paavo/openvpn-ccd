@@ -359,3 +359,23 @@ func StaticAccountEdit(ccdManager *model.CCDManager, db *gorm.DB) gin.HandlerFun
 		})
 	}
 }
+
+// 添加新的路由处理函数
+func GetCCDConfig(ccdManager *model.CCDManager) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		username := c.Param("username")
+
+		// 读取CCD文件内容
+		content, err := ccdManager.GetCCDConfigContent(username)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"error": "获取CCD配置失败: " + err.Error(),
+			})
+			return
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"content": content,
+		})
+	}
+}

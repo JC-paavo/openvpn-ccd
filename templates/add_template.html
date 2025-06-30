@@ -112,7 +112,26 @@
     $('#iroutes').select2({
       theme: 'bootstrap-5',
       placeholder: '请选择IRoute路由',
-      closeOnSelect: false
+      closeOnSelect: false,
+      //搜索使用
+      minimumInputLength: 0, // 允许不输入任何字符
+      language: {
+        inputTooShort: function() {
+          return ''; // 清空输入过短的提示
+        }
+      },
+      matcher: function(params, data) {
+        // 如果没有输入搜索词，显示所有选项
+        if ($.trim(params.term) === '') {
+          return data;
+        }
+        // 如果有搜索词，只显示匹配项
+        if (data.text.toLowerCase().indexOf(params.term.toLowerCase()) > -1) {
+          return data;
+        }
+        return null;
+      }
+
     });
   });
   // 显示错误信息

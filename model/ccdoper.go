@@ -267,6 +267,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 						return fmt.Errorf("更新irouter账号配置失败: %v", err)
 					}
 				}
+
 				//更新普通账号关联的irouter路由
 				for _, account := range normalAccounts {
 					var newNoraccount Account
@@ -936,4 +937,16 @@ func (m *CCDManager) updateAccountsByTemplate(templateID uint) error {
 		}
 	}
 	return nil
+}
+
+// 获取CCD文件内容
+func (m *CCDManager) GetCCDConfigContent(username string) (string, error) {
+	filePath := filepath.Join(m.ccdDir, username)
+
+	content, err := os.ReadFile(filePath)
+	if err != nil {
+		return "", fmt.Errorf("读取CCD文件失败: %v", err)
+	}
+
+	return string(content), nil
 }

@@ -26,4 +26,6 @@ func accountRouter(api *gin.RouterGroup, ccdManager *model.CCDManager) {
 	api.GET("/accounts/:username/iroutes", Controller.AccountIrouterOneinfo(ccdManager))
 	// 获取账号关联的模板
 	api.GET("/accounts/:username/templates", Controller.AccountTemplates(ccdManager))
+	// 在路由配置中添加
+	api.GET("/accounts/:username/ccd", Controller.GetCCDConfig(ccdManager))
 }
