@@ -10,7 +10,7 @@ OpenVPN CCD 配置管理系统是一个用于管理 OpenVPN 客户端特定配�
 - **日志记录**：记录用户操作和系统请求信息，便于审计和故障排查。
 
 ## 项目结构
-```azure
+```
 openvpn-ccd/
 ├── .env                # 环境变量配置文件
 ├── .gitignore          # Git 忽略文件
@@ -68,7 +68,11 @@ SESSION_SECRET=1234
 
 ### 3. 启动服务
 ```bash
-go run main.go
+go run main.go -mode web
+```
+oepnvpn 验证账号密码
+```bash
+go run main.go -mode cmd -user USERNAME -pass PASSWORD
 ```
 
 ### 4. 访问

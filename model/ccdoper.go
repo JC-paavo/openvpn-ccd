@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 	"log"
 	"openvpn-ccd/utils"
@@ -60,7 +59,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 
 	// 加密密码
 	if newAccount.Password != "" {
-		hashedPassword, err := hashPassword(newAccount.Password)
+		hashedPassword, err := utils.HashPassword(newAccount.Password)
 		if err != nil {
 			return fmt.Errorf("密码加密失败: %v", err)
 		}
@@ -756,18 +755,6 @@ func writeTemplateRoute(tpls []Template, file *os.File) error {
 		}
 	}
 	return nil
-}
-
-// 密码加密
-func hashPassword(password string) (string, error) {
-	bytes, err := bcrypt.GenerateFromPassword([]byte(password), 14)
-	return string(bytes), err
-}
-
-// 验证密码
-func verifyPassword(hashedPassword, password string) bool {
-	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
-	return err == nil
 }
 
 // 验证邮箱格式
