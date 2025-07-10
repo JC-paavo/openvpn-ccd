@@ -321,7 +321,7 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 			}
 		}
 		fmt.Println("更新操作...")
-		return m.db.Transaction(func(tx *gorm.DB) error {
+		err := m.db.Transaction(func(tx *gorm.DB) error {
 			//删除自定义路由
 			if err := m.db.Exec("DELETE FROM account_routes WHERE account_id = ? AND route_id NOT IN (SELECT route_id FROM template_routes) AND route_id NOT IN (SELECT route_id FROM account_routes WHERE account_id IN (SELECT id FROM accounts WHERE is_iroute = true))", existing.ID).Error; err != nil {
 				return fmt.Errorf("删除自定义路由失败: %v", err)
@@ -358,6 +358,9 @@ func (m *CCDManager) CreateOrUpdateAccount(newAccount Account, user string, c *g
 			m.db.Model(&newAccount).Association("Templates").Append(templates)
 			return nil
 		})
+		if err != nil {
+			return err
+		}
 	}
 	m.generateCCDConfig(newAccount.Username)
 	return nil
