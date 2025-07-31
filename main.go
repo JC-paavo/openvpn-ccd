@@ -8,10 +8,12 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"log"
+	"openvpn-ccd/Middle"
 	"openvpn-ccd/Router"
 	"openvpn-ccd/model"
 	"openvpn-ccd/utils"
 	"os"
+	"time"
 )
 
 // 加载环境变量
@@ -109,7 +111,18 @@ func main() {
 			log.Println("account not found:", *username)
 			os.Exit(1)
 		}
+		logLogin := &model.Log{}
+		queryTime := time.Now().Add(-10 * time.Minute).Format("2006-01-02 15:04:05.000000+08:00")
+		var loginCount int64
+		if err := db.Where("user = ? and action=? and create_at > ?", *username, "openvpn登录失败", queryTime).Find(&logLogin).Count(&loginCount).Error; err != nil {
+			log.Println("login count not found:", *username)
+		}
+		if loginCount > 3 {
+			log.Println("账号登录失败次数超过3次，已锁定:", *username)
+			os.Exit(1)
+		}
 		if res := utils.VerifyPassword(account.Password, *password); !res {
+			Middle.CreateLog(db, *username, "openvpn登录失败", "账号密码错误", "NA", "NA")
 			log.Println("密码错误:", *username)
 			os.Exit(1)
 		}
